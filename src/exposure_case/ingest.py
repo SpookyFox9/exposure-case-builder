@@ -9,6 +9,7 @@ Layout of an export directory (written by ``scripts/fetch_tenable.py``)::
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -58,6 +59,23 @@ class FindingRecord:
     unsupported_by_vendor: bool
     checks_for_default_account: bool
     output: str
+    # Fix and risk context carried by the export (all optional; empty fields are omitted by Tenable).
+    solution: str = ""
+    see_also: tuple[str, ...] = ()
+    cves: tuple[str, ...] = ()
+    cpe: tuple[str, ...] = ()
+    has_workaround: bool = False
+    patch_published: datetime | None = None
+    cvss3_base_score: float | None = None
+    epss_score: float | None = None
+    vpr_score: float | None = None
+    vpr_severity: str = ""
+    on_cisa_kev: bool = False
+    exploit_code_maturity: str = ""
+    # Finding-level fix history (present on a minority of findings; seconds for fix_seconds).
+    last_fixed: datetime | None = None
+    resurfaced: datetime | None = None
+    fix_seconds: int | None = None
 
     def evidence(self) -> Evidence:
         return Evidence(source="finding", record_id=self.finding_id)
@@ -135,6 +153,28 @@ def _opt_int(value: Any) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
+def _str_tuple(value: Any) -> tuple[str, ...]:
+    """A list of strings; anything else (or non-string items) is dropped."""
+    return tuple(v.strip() for v in value if isinstance(v, str) and v.strip()) if isinstance(value, list) else ()
+
+
+def _opt_number(value: Any, low: float | None = None, high: float | None = None) -> float | None:
+    """A real number (never a bool), optionally range-checked; otherwise None."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    if (low is not None and value < low) or (high is not None and value > high):
+        return None
+    return float(value)
+
+
+def _optional_ts(value: Any) -> datetime | None:
+    """Optional metadata timestamps degrade to None; required ones still raise via _parse_ts."""
+    try:
+        return _parse_ts(value, "optional") if value else None
+    except IngestError:
+        return None
+
+
 def parse_record(raw: Any) -> FindingRecord:
     """Validate and normalize one export record."""
     if not isinstance(raw, dict):
@@ -152,6 +192,8 @@ def parse_record(raw: Any) -> FindingRecord:
 
     started = scan.get("started_at")
     os_list = asset.get("operating_system")
+    vpr = _optional_section(plugin, "vpr")
+    fix_seconds = _opt_int(raw.get("time_taken_to_fix"))
     return FindingRecord(
         finding_id=_required_str(raw, "finding_id", "record"),
         plugin_id=plugin_id,
@@ -179,6 +221,21 @@ def parse_record(raw: Any) -> FindingRecord:
         unsupported_by_vendor=bool(plugin.get("unsupported_by_vendor")),
         checks_for_default_account=bool(plugin.get("checks_for_default_account")),
         output=_text(raw.get("output")),
+        solution=_text(plugin.get("solution")).strip(),
+        see_also=_str_tuple(plugin.get("see_also")),
+        cves=_str_tuple(plugin.get("cve")),
+        cpe=_str_tuple(plugin.get("cpe")),
+        has_workaround=plugin.get("has_workaround") is True,
+        patch_published=_optional_ts(plugin.get("patch_publication_date")),
+        cvss3_base_score=_opt_number(plugin.get("cvss3_base_score"), 0, 10),
+        epss_score=_opt_number(plugin.get("epss_score"), 0),
+        vpr_score=_opt_number(vpr.get("score"), 0, 10),
+        vpr_severity=_text(vpr.get("vpr_severity")),
+        on_cisa_kev=vpr.get("on_cisa_kev") is True,
+        exploit_code_maturity=_text(vpr.get("exploit_code_maturity")),
+        last_fixed=_optional_ts(raw.get("last_fixed")),
+        resurfaced=_optional_ts(raw.get("resurfaced_date")),
+        fix_seconds=fix_seconds if fix_seconds is not None and fix_seconds >= 0 else None,
     )
 
 

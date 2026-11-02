@@ -28,8 +28,13 @@ WEIGHTS: tuple[tuple[str, int], ...] = (
     ("patch", 5),         # a patch exists, so the fix is actionable
 )
 SEVERITY_SCALE = {"critical": 1.0, "high": 0.75, "medium": 0.4, "low": 0.1, "info": 0.0}
+EXPLOIT_KEV = 1.0  # on the CISA Known Exploited Vulnerabilities list
 EXPLOIT_MALWARE = 1.0
+EXPLOIT_VPR_CRITICAL = 0.9  # VPR 9.0-10 (Tenable's critical band)
+EXPLOIT_VPR_HIGH = 0.7  # VPR 7.0-8.9 (Tenable's high band)
 EXPLOIT_AVAILABLE = 0.6
+VPR_CRITICAL_MIN = 9.0
+VPR_HIGH_MIN = 7.0
 EXPLOIT_IN_NEWS_BONUS = 0.2
 VOLUME_SATURATION = 1000  # distinct plugins
 AGE_SATURATION_DAYS = 180
@@ -88,13 +93,23 @@ def _severity(c: Cluster) -> ScoreComponent:
     return ScoreComponent("severity", 30, SEVERITY_SCALE[worst], f"worst active severity: {worst}")
 
 
+def _exploit_signal(r: FindingRecord) -> tuple[float, str]:
+    """Strongest exploitation signal on one finding, with the reason."""
+    if r.on_cisa_kev:
+        return EXPLOIT_KEV, "on the CISA KEV list"
+    if r.exploited_by_malware:
+        return EXPLOIT_MALWARE, "exploited by malware"
+    if r.vpr_score is not None and r.vpr_score >= VPR_CRITICAL_MIN:
+        return EXPLOIT_VPR_CRITICAL, f"VPR {r.vpr_score:g} (critical)"
+    if r.vpr_score is not None and r.vpr_score >= VPR_HIGH_MIN:
+        return EXPLOIT_VPR_HIGH, f"VPR {r.vpr_score:g} (high)"
+    if r.exploit_available:
+        return EXPLOIT_AVAILABLE, "public exploit available"
+    return 0.0, "no known exploit"
+
+
 def _exploit(c: Cluster) -> ScoreComponent:
-    if any(r.exploited_by_malware for r in c.active):
-        raw, why = EXPLOIT_MALWARE, "exploited by malware"
-    elif any(r.exploit_available for r in c.active):
-        raw, why = EXPLOIT_AVAILABLE, "public exploit available"
-    else:
-        raw, why = 0.0, "no known exploit"
+    raw, why = max((_exploit_signal(r) for r in c.active), key=lambda pair: pair[0])
     if any(r.in_the_news for r in c.active):
         raw, why = min(1.0, raw + EXPLOIT_IN_NEWS_BONUS), why + ", in the news"
     return ScoreComponent("exploit", 25, raw, why)

@@ -3,20 +3,21 @@
 The export has ``first_found`` and ``last_found`` per finding, not an event log. So the timeline
 is honest about that: ``last_seen_fixed`` is the last time a since-fixed finding was observed
 (the fix happened after it), and ``last_seen_reopened`` is the latest observation of a finding
-that came back, not the moment it reopened.
+that came back, not the moment it reopened. On the minority of findings that carry Tenable's own
+``last_fixed`` / ``resurfaced_date``, those real dates are used instead (``fixed`` / ``reopened``).
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 from .cluster import Cluster
 from .ingest import FindingRecord
 from .schema import Evidence
 
-KIND_ORDER = ("first_seen", "last_seen_reopened", "last_seen_fixed")
+KIND_ORDER = ("first_seen", "fixed", "reopened", "last_seen_reopened", "last_seen_fixed")
 
 
 @dataclass(frozen=True)
@@ -40,25 +41,31 @@ class TimelineEvent:
         }
 
 
-def _events(records: list[FindingRecord], kind: str, when) -> list[TimelineEvent]:
-    by_day: dict[date, list[FindingRecord]] = defaultdict(list)
-    for record in records:
-        by_day[when(record).date()].append(record)
-    return [
+def _plan(record: FindingRecord) -> list[tuple[str, datetime]]:
+    """The events one finding contributes, preferring Tenable's real dates over last-seen approximations."""
+    plan = [("first_seen", record.first_found)]
+    if record.last_fixed:
+        plan.append(("fixed", record.last_fixed))
+    if record.state == "REOPENED":
+        plan.append(("reopened", record.resurfaced) if record.resurfaced else ("last_seen_reopened", record.last_found))
+    elif record.state == "FIXED" and not record.last_fixed:
+        plan.append(("last_seen_fixed", record.last_found))
+    return plan
+
+
+def build_timeline(cluster: Cluster) -> tuple[TimelineEvent, ...]:
+    """Chronological events for a case, grouped per UTC day; ties ordered by KIND_ORDER."""
+    buckets: dict[tuple[str, date], list[FindingRecord]] = defaultdict(list)
+    for record in list(cluster.active) + list(cluster.fixed):
+        for kind, when in _plan(record):
+            buckets[(kind, when.date())].append(record)
+    events = [
         TimelineEvent(
             date=day,
             kind=kind,
             hosts=len({r.asset_uuid for r in rs}),
             evidence=tuple(r.evidence() for r in sorted(rs, key=lambda r: r.finding_id)),
         )
-        for day, rs in by_day.items()
+        for (kind, day), rs in buckets.items()
     ]
-
-
-def build_timeline(cluster: Cluster) -> tuple[TimelineEvent, ...]:
-    """Chronological events for a case, grouped per UTC day; ties ordered by KIND_ORDER."""
-    everything = list(cluster.active) + list(cluster.fixed)
-    events = _events(everything, "first_seen", lambda r: r.first_found)
-    events += _events([r for r in cluster.active if r.state == "REOPENED"], "last_seen_reopened", lambda r: r.last_found)
-    events += _events(list(cluster.fixed), "last_seen_fixed", lambda r: r.last_found)
     return tuple(sorted(events, key=lambda e: (e.date, KIND_ORDER.index(e.kind))))

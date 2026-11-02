@@ -102,7 +102,9 @@ Total = sum of component points (max 100). Every case returns the component brea
 
 Ages are measured from the latest `last_found` in the data, never the wall clock, so ranking is deterministic. Ties break on cluster id.
 
-**Hand-check, full export (2026-11-02, after the CISCO split):** 815 cases rank in under a second. Top: Windows Microsoft Bulletins (14 hosts, 621 vulns, 86.9), Ubuntu (12 hosts, 81.8), Junos, Solaris, Oracle Linux, Red Hat; among plugin cases Shellshock (#13), then old Flash, BlueKeep, SIGRed, libcurl, Sudo, Log4j. Patch families take 14 of the top 30 because "any critical, any malware-exploited" saturates for hundreds of plugins; order among them rests on breadth, volume and age. **Weights approved by the user.**
+**Hand-check, full export (2026-11-02, after KEV/VPR; superseded detail below):** 815 cases rank in under a second. Top: Windows Microsoft Bulletins (14 hosts, 621 vulns, 86.9), Ubuntu (12 hosts, 81.8), Junos, Solaris, Oracle Linux, Red Hat; among plugin cases Shellshock (#13), then old Flash, BlueKeep, SIGRed, libcurl, Sudo, Log4j. Patch families take 14 of the top 30 because "any critical, any malware-exploited" saturates for hundreds of plugins; order among them rests on breadth, volume and age. **Weights approved by the user.**
+
+**After KEV/VPR:** 549 of 7,148 plugins (793 findings) are on the CISA KEV list and 504 more have VPR >= 9, so every large patch family saturates the exploit component. Top cases: Windows Bulletins 86.9, Ubuntu 81.8, Junos, Solaris, Oracle Linux, Red Hat ... (14 of the top 30 are patch families); KEV pulls Cisco IOS/NX-OS RCE advisories (#15-19), old Flash (#20, #22) and BlueKeep (#21) into the top 25. Top fix packages: Ubuntu (13 hosts, 111 critical, 37 KEV), .NET Framework, Windows, Debian, OpenSSH (21 hosts, 40 vulns), CentOS, Junos, Cisco IOS. Presentation decision: the case queue must show single-plugin threats and patch backlogs as two lists (`kind` filter), because backlogs otherwise bury threats such as BlueKeep.
 
 ## MCP tools
 
@@ -150,11 +152,13 @@ The data path comes from `EXPOSURE_CASE_DATA` or a server argument; no tool acce
 
 **Phase 3b: fix view (decided 2026-11-02)**
 1. [x] Split CISCO from patch families; correct the PLAN facts about `solution`/VPR
-2. [ ] Extend ingest with fix and risk fields (tests first)
-3. [ ] `fixes.py`: fix packages keyed by normalized product + fix type, impact, deterministic
-4. [ ] Case-fix links (every finding in exactly one case and one package)
-5. [ ] KEV and high VPR folded into the exploit component (weights unchanged); re-hand-check the top 25
-6. [ ] Real `last_fixed` / `resurfaced_date` in the timeline where present
+2. [x] Ingest carries solution, see_also, CVEs, CPE, VPR (score, severity, KEV, exploit maturity), EPSS, CVSS3, patch date, fix dates; malformed optional fields degrade to defaults (`test_ingest_fix_fields.py`)
+3. [x] `fixes.py`: 200 fix packages on the full export (125 patch, 75 configuration; 58 plugin-level fallbacks), built in 0.9 s; every one of the 10,283 active non-info findings is in exactly one package
+4. [x] `links.py`: case-to-fix and fix-to-case links with shares; raises if the two views do not describe the same findings. `rank_packages` scores packages with the same approved weights
+5. [x] CISA KEV and VPR folded into the exploit component, weights unchanged: KEV 1.0, malware 1.0, VPR >= 9 0.9, VPR 7-8.9 0.7, public exploit 0.6, +0.2 in the news (cap 1)
+6. [x] Real `last_fixed` / `resurfaced_date` in the timeline (kinds `fixed`, `reopened`; `last_seen_*` only as fallback). On the full export every fixed or reopened non-info finding has them
+
+Fix-type rule (documented in `fixes.py`): the solution's opening verb decides. update/upgrade/apply/install/"Microsoft has released" = `patch`; "Contact the vendor ... for an update/patch" = `patch` unless it also says disable/configure/remove etc.; everything else = `configuration`; empty = `unspecified`. `has_patch` is NOT used (true for 98% of plugins) and `has_workaround` is always false in this tenant.
 
 **Phase 4: case and export**
 1. [ ] Case assembly
@@ -194,8 +198,9 @@ Last updated: 2026-11-02, Monday evening.
 - Done: Tenable keys stored in `~/.secrets/tenable.cred.xml` (DPAPI); `tenable-env.ps1` loads them per session. Survey scripts live in the session scratchpad, not the repo.
 - Done (Phase 1): package renamed to `exposure_case`; insider generator, data and tests removed; `Finding` now uses `subject`; 8 tests pass; docs rewritten. Nothing is committed yet.
 - Done (Phase 2): `ingest.py`, `scripts/fetch_tenable.py`, `scripts/make_sample.py`, `data/sample/` (1.3 MB, gitleaks clean). 139 tests pass. The full export lives in `data/raw/full1` (gitignored, about 108 MB). Committed as `094e311`.
+- Done (Phase 3b): ingest fix fields, `fixes.py`, `links.py`, KEV/VPR in scoring, real fix dates in the timeline; 228 tests, ruff and mypy clean.
 - Done (Phase 3): `cluster.py`, `scoring.py`, `timeline.py`, `reconcile.py`; 139 tests pass; ruff and mypy clean. 815 cases from the full export (15 patch families, 800 plugins). Weights approved.
-- In progress (Phase 3b, fix view): extend ingest with solution/see_also/CVE/VPR/EPSS/KEV/CPE/fix dates; `fixes.py`; case-fix links; KEV in exploit component; real fix dates in timeline. Then Phase 4.
+- Next: Phase 4 (case file and exports for analysts and for engineers), then Phase 5 (MCP server with a `kind` filter on the queue, skill, playbook).
 
 ## Resuming in a new session
 
