@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 
@@ -20,25 +19,12 @@ class Evidence:
 
 
 @dataclass(frozen=True)
-class Event:
-    """One normalized record from any source (logon, device, file, email, http)."""
-
-    source: str
-    record_id: str
-    ts: datetime
-    user: str
-    pc: str
-    summary: str
-
-
-@dataclass(frozen=True)
 class Finding:
-    """A detector result. Evidence is mandatory: no finding without source records."""
+    """A detector result about one subject (a cluster, an asset). Evidence is mandatory."""
 
     id: str
     detector: str
-    user: str
-    date: str
+    subject: str
     score: float
     rationale: str
     evidence: tuple[Evidence, ...]
@@ -56,8 +42,7 @@ class Finding:
         return {
             "id": self.id,
             "detector": self.detector,
-            "user": self.user,
-            "date": self.date,
+            "subject": self.subject,
             "score": self.score,
             "rationale": self.rationale,
             "evidence": [ev.to_dict() for ev in self.evidence],

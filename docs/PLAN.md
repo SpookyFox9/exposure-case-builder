@@ -1,183 +1,169 @@
-# Insider Case Builder: Build Plan
+# Exposure Case Builder: Build Plan
 
-Living plan for the SWARM Global build (Nov 2–6, 2026). Update the **Status** section as work lands. A new session should read this file and `CLAUDE.md` first.
+Living plan for the SWARM Global build (Nov 2-6, 2026). Update the **Status** section as work lands. A new session should read this file and `CLAUDE.md` first.
+
+**Pivot (2026-11-02):** the project began as an insider-threat case builder on CERT data. The competition Tenable tenant has no user-activity telemetry (only users, assets, scans, vulnerability findings), so the build now targets vulnerability exposure. The architecture carries over; the insider code is in git history (`56f8788` and earlier).
 
 ## What we're building
 
-Insider Threat Case Builder baselines each user's activity against their peers, uses rule-based detectors to flag deviations such as off-hours logons, first-time USB use, file-copy spikes and job-site browsing, and assembles a case file with a timeline and the source records behind every finding. Claude then writes the case narrative and suggests next investigative steps, and the human analyst records the final disposition.
+One **case per finding cluster**: a vulnerability (Tenable plugin) affecting many assets. A triage queue ranks clusters so a human sees the most important work first. Each case holds the affected assets, a timeline, a score breakdown and the source records, and exports as Markdown, CSV and JSON for engineers on other teams. Claude writes the narrative; the human records the disposition.
 
 Three components with a fixed division of labor:
 
-1. **Deterministic Python engine** (stdlib only). Ingests CSV, builds per-user and peer-group baselines, runs detectors, assembles case files. No ML.
+1. **Deterministic Python engine** (stdlib only). Ingests a saved Tenable export, clusters, scores, assembles cases and exports. No ML.
 2. **Stdio MCP server** wrapping the engine.
-3. **Claude Code skill** (`/insider-case`) plus a short playbook that chains the tools.
+3. **Claude Code skill** (`/exposure-case`) plus a short playbook that chains the tools.
 
 ## Decisions made
 
 | Decision | Choice | Why |
 |---|---|---|
-| Input format | CSV only (no Parquet) | CERT is CSV; Parquet needs `pyarrow`, against the stdlib-first rule |
-| Disposition | Fifth MCP tool `record_disposition`: local append-only JSONL, requires `confirm=true`, no external effect | Brief requires a recorded human disposition; Exchange guidance asks for explicit confirmation on writes. Document as the only write in the README |
-| MCP SDK | `mcp==2.3.0` (fallback `1.30.0`) | See "MCP SDK facts" below |
-| Test data order | Synthetic generator first, CERT second | Never blocked on the download |
-| Repo location | `insider-case-builder/` subdirectory of the SWARM vault folder | Keeps the research doc and `.obsidian` out of the public repo |
-| Python | >=3.10 via `uv` (default `python` here is 3.9.13, too old) | `mcp` requires >=3.10 |
+| Domain | Vulnerability exposure, not insider threat | Tenant data fits; no equivalent on the Exchange; user judged insider threat added needless complication |
+| Case unit | Finding cluster keyed by `plugin.id` | A human acts on one fix across many assets, not 50 per-asset cases |
+| Optional rollup | Group clusters by `plugin.family`/`cpe` product | Stretch goal |
+| Score | Transparent weighted sum, breakdown shown, weights in one table | Explainable, no ML |
+| Context fields | Optionally join VPR and CVSS from `/workbenches/vulnerabilities` by `plugin_id` | The export has neither; the workbench list is capped at 5,000 rows, so coverage is partial and the score must not depend on it |
+| Team grouping | Affected assets grouped by OS, device type, /24 subnet | Tenant has no tags and only 2 groups |
+| Export | Markdown handoff + CSV of affected assets + JSON bundle; text by default, file write needs `confirm=true` to a fixed directory | Shareable with other teams |
+| Disposition | `record_disposition` per cluster: `assigned`, `risk-accepted`, `false-positive`, `needs-info`, plus a note | Append-only local JSONL, `confirm=true` |
+| Data | Competition tenant (fake, masked); trimmed sample committed, full export gitignored | User confirmed it is all fake data |
+| Fetch | Optional documented script `scripts/fetch_tenable.py`; engine reads saved files | Offline deterministic core |
+| Secrets | DPAPI-encrypted file `~/.secrets/tenable.cred.xml`, loaded to env vars per session | No new dependency, nothing in the repo |
+| Repo | Reuse this repo; package renamed `exposure_case` | User chose reuse |
+| MCP SDK | `mcp==2.3.0` | Smoke-tested in Claude Code 2026-11-02; `from mcp.server.mcpserver import MCPServer` |
+| Python | >=3.10 via `uv` | `mcp` requires >=3.10 |
 
-## MCP SDK facts (checked 2026-11-02)
+## Tenable data facts (surveyed 2026-11-02, Tenable Vulnerability Management, cloud.tenable.com)
 
-- `mcp` 2.3.0 on PyPI (released 2026-10-02) requires Python >=3.10. 2.x began 2026-07-28; previous line is 1.30.0.
-- Bundled `mcp-types` knows protocol revisions 2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25 (handshake) and 2026-07-28 (modern stateless).
-- 2.x removed `FastMCP`. Use `from mcp.server.mcpserver import MCPServer`.
-- SDK client and server negotiated **2025-11-25** over stdio in our smoke test.
-- Verified 2026-11-02: Claude Code's own MCP client connects to a 2.3.0 stdio server and can call a tool (`ping` returned `pong`).
+- `/users`: 75; `/groups`: 2; `/assets`: 178 (164 with vulns); `/scans`: 4 (Partner Lab, Weekly Network, BeyondTrust Advanced Agent, Daily Agent); tag values: 0.
+- `/audit-log/v1/events`: HTTP 403 with the current read-only keys.
+- `/workbenches/vulnerabilities`: 5000 plugin-level rows (possibly a cap, unverified) with `count`, `severity`, `vpr_score`, `cvss_base_score`, `cvss3_base_score`, `plugin_family`, `plugin_id`, `plugin_name`, `vulnerability_state`.
+- `POST /vulns/export` (states open/reopened/fixed): `num_assets` is the **assets per chunk**, not a limit. The default fleet export returns 4 chunks. Full export (fetched 2026-11-02, 30 s, about 108 MB on disk): **19,437 findings, 160 assets, 7,714 plugins (7,148 clusters with non-info, non-fixed findings), 18 scans**. States: 18,448 OPEN, 604 REOPENED, 385 FIXED. Severity: 9,071 info, 4,391 medium, 3,856 high, 1,354 critical, 765 low. 3,531 have `exploit_available`, 753 `exploited_by_malware`, 192 `in_the_news`, 50 `unsupported_by_vendor`, 0 `checks_for_default_account`. `first_found` spans 2026-05-18 to 2026-11-02. There are no duplicate (asset, plugin, port, protocol) rows.
+- Record keys: `finding_id`, `state`, `severity`, `first_found`, `last_found`, `asset{uuid,hostname,ipv4,operating_system,device_type,...}`, `plugin{id,name,family,synopsis,description,exploit_available,exploited_by_malware,in_the_news,has_patch,unsupported_by_vendor,checks_for_default_account,exploit_framework_*,xrefs,cpe,...}`, `port{port,protocol,service}`, `scan{uuid,started_at,schedule_uuid,target}`, `output`, `source`. No `vpr`, `cvss` or `solution` field in the export's plugin object.
+- **The workbench plugin list is capped at exactly 5,000 rows**, so 3,000 of the 7,677 clusters with non-fixed findings have no workbench row. VPR is present for only 4,049 of 7,677 clusters. **The score therefore cannot depend on VPR**; VPR/CVSS are optional context shown when available.
+- **Reconciliation** (distinct non-fixed assets per plugin vs workbench `count`): 4,622 of 4,677 comparable clusters match exactly; 55 do not (about 1.2%), and all 55 have the export below the workbench count (by 1 to 31). The workbench saw 164 assets with vulns, the export has 160. The cause is unverified (not just those 4 assets, since one gap is 31). Treat reconciliation as a reported tolerance, not a hard assertion.
+- OS strings are highly varied (120 distinct first OS strings), so peer grouping needs normalization to an OS family. Device types: general-purpose 15,961, embedded 1,250, switch 551, unknown 428, firewall 422.
+- IPs, hostnames and similar fields are masked. Never OSINT them.
+- **Unverified:** where remediation text (`solution`) lives (not in the export), whether the workbench plugin list can be paged past 5,000 rows, the cause of the reconciliation gap, what the 4 assets missing from the export are.
 
 ## Constraints (from the brief)
 
 - MIT license; public repo on a personal GitHub account (not EMU).
 - No secrets anywhere in git history (automatic Exchange rejection even if rotated). The pre-commit gitleaks hook stays on.
-- Synthetic or public data only. Never reference any employer or any real organization's data, policies, field names or detection content.
-- Never commit raw CERT files. Ship a download script and a small synthetic sample.
-- Read-only by default; no outbound network calls unless documented in the README; output is evidence and facts, not verdicts; no HR or disciplinary recommendations.
-- Pin every dependency; justify each third-party one. The engine is stdlib-only, and `mcp` is the single runtime dependency.
-- Every finding carries the source records that triggered it.
+- Read-only by default; local writes only, behind `confirm=true`; every outbound path documented in the README.
+- Output is evidence and facts; no recommendation targets a person; remediation guidance only from plugin data and labelled.
+- Pin every dependency; justify each third-party one. `mcp` is the single runtime dependency.
+- Every cluster number carries source record IDs.
 
 ## Repo layout
 
 ```
-insider-case-builder/
+insider-case-builder/               (directory name is a leftover; package is exposure_case)
 ├── LICENSE, README.md, CLAUDE.md, pyproject.toml, uv.lock
-├── .githooks/pre-commit        gitleaks on staged changes
-├── src/insider_case/
-│   ├── schema.py               frozen dataclasses (Event, Finding, Evidence)
-│   ├── ingest/                 csv readers, normalizers
-│   ├── baseline.py             per-user and peer-group stats
-│   ├── detectors/              one module per detector + registry
-│   ├── case.py                 timeline and case_file assembly
-│   ├── disposition.py          append-only local JSONL log
-│   └── server.py               MCP stdio server (thin wrapper)
-├── data/synthetic/             generator output (small, committed)
-├── scripts/                    make_synthetic.py, download_cert.py, subset_cert.py
-├── skills/insider-case/SKILL.md
-├── playbooks/insider-case-playbook.md
+├── .githooks/pre-commit            gitleaks on staged changes
+├── src/exposure_case/
+│   ├── schema.py                   frozen dataclasses (Evidence, Finding)
+│   ├── ingest.py                   export reader (FindingRecord, PluginInfo)
+│   ├── cluster.py                  group findings by plugin
+│   ├── scoring.py                  weighted components + breakdown
+│   ├── case.py                     cluster case assembly and timeline
+│   ├── export.py                   Markdown / CSV / JSON handoff
+│   ├── disposition.py              append-only local JSONL log
+│   └── server.py                   MCP stdio server (thin wrapper)
+├── data/sample/                    committed sample: 1,125 findings, 154 assets, 50 plugins (data/raw/ is gitignored)
+├── scripts/fetch_tenable.py        the one outbound path
+├── scripts/make_sample.py          builds data/sample/ from a full export
+├── skills/exposure-case/SKILL.md
+├── playbooks/exposure-case-playbook.md
 ├── tests/
-└── docs/                       PLAN.md, data-flows.md, detector-catalog.md
+└── docs/                           PLAN.md
 ```
 
-**README sections (Exchange requires):** Purpose, Prerequisites, How to run (synthetic quickstart, then CERT, then MCP config for Claude Code), Outputs, Known limitations, Data flows (state "no outbound calls"; the CERT download script is the one documented exception), Data sources and licensing. Tag a release (v0.1.0) and submit from the tag.
+**README sections (Exchange requires):** Purpose, Prerequisites, How to run, Outputs, Known limitations, Data flows, Data sources and licensing. Tag a release (v0.1.0) and submit from the tag.
 
-## Data plan
+## Scoring (initial design; weights to be fixed in Phase 3 and documented here)
 
-**Synthetic generator (first).** Seeded and reproducible. Emits CERT-shaped files: `logon`, `device`, `file`, `email`, `http`, a roster, and an `answers` file. About 50 users across 3–4 departments, 6 planted insiders across 3 patterns, 2 benign decoys that look odd (for example, a late-night release engineer).
-
-**CERT r4.2.**
-- `download_cert.py` fetches from the KiltHub DOI 10.1184/R1/12841247 and verifies a checksum.
-- `subset_cert.py` streams each large CSV once, keeping about 50 users: about 8 insiders across the scenarios plus about 42 others from the same departments and roles. Fixed seed.
-- `data/raw/` and `data/subset/` are gitignored.
-
-**Unverified (recalled from memory, confirm on the real files):** CERT column layouts, the answers folder structure, and r4.2 containing 3 scenarios. The first job on the real download is to inspect headers and fix the schema. **License checked 2026-11-02 on the KiltHub record** (https://kilthub.cmu.edu/articles/dataset/Insider_Threat_Test_Dataset/12841247, read in a browser; the page returns 403 to automated fetchers): licence **CC BY 4.0**, authored by Brian Lindauer, posted 2020-09-30, funded by DARPA. Attribution is required: cite the dataset DOI and the paper "Bridging the Gap: A Pragmatic Approach to Generating Insider Threat Data". The record text shows no registration wall, but the "Download all" bundle is **87.23 GB** (all releases), so `download_cert.py` must fetch only the r4.2 file and `answers.tar.bz2`. **Still unverified:** the per-file list, sizes and checksums (not in the page text), whether the individual file download URLs work unauthenticated, and the SEI page's separate "Request Permission to Use SEI Materials" form (not opened; likely irrelevant to a CC BY dataset but check before redistributing any derived subset). Reported r4.2 duration conflicts across sources (17 months, 18 months, 500 days).
-
-## Detectors (rule-based, each finding cites source record IDs)
-
-| # | Detector | Fields | Rule |
-|---|---|---|---|
-| D1 | Off-hours logon | logon: user, pc, date, activity | Logon outside the user's own typical hour band |
-| D2 | First-seen removable media | device: user, pc, activity | First connect ever for the user, or on an unusual PC |
-| D3 | File-copy spike | file: user, date, filename | Daily count above user median + k·MAD and above peers |
-| D4 | Job-site browsing | http: user, url; roster end date | Job-board domain visits, weighted toward the weeks before departure |
-| D5 | Exfil-site visit | http: url | Domains on a documented upload/leak-site list |
-| D6 | External email with attachment | email: recipients, attachment_count, size | Non-corporate recipient plus attachment vs. user baseline |
-| D7 | Unusual-PC logon | logon: user, pc | Logon on a PC that isn't the user's usual one |
-| D8 (stretch) | Off-hours device use | device + logon | D1 and D2 in the same session |
-
-**Validation.**
-1. Per-insider recall (is the user flagged at all) and per-event recall (does a finding point at an answer event), using the answers files.
-2. Rank all users by score; report how many insiders land in the top 5/10 and false positives per benign user.
-3. Tune thresholds on about half the users and report on the other half; state the split.
-4. Unit tests with hand-built fixtures for every detector (positive, negative, boundary).
-5. Expect uneven results (scenario 3, the keylogger case, may be weak). The README says so plainly.
+Components per cluster: max severity, `exploit_available`, `exploited_by_malware`, `in_the_news`, `has_patch` (patchable raises actionability), affected asset count, age (oldest `first_found`), reopened count, `unsupported_by_vendor`, `checks_for_default_account`, VPR (if joined). The case shows each component's value and contribution.
 
 ## MCP tools
 
-All read-only except `record_disposition`. The dataset path comes from `INSIDER_CASE_DATA` or a server argument; no tool accepts arbitrary file paths.
+| Tool | Output |
+|---|---|
+| `fleet_summary` | Totals, severity distribution, state counts |
+| `clusters` | Ranked list: cluster ID, plugin, score, asset count, max severity, age, one-line reason; `top_n` |
+| `cluster_case` | Summary, score breakdown, affected-asset table, timeline, fleet share, sample plugin output, remediation info, evidence record IDs |
+| `export_case` | Markdown, CSV, JSON handoff; file writes need `confirm=true` |
+| `record_disposition` | `cluster_id`, `analyst`, `disposition`, `note`, `confirm`; rejects unless `confirm=true` |
 
-| Tool | Input | Output |
-|---|---|---|
-| `baseline` | `user_id`, optional `window_days` | `{user, peer_group, stats:{logon_hours, devices, file_copy_daily, email_ext_daily, ...}, peer_stats, n_days}` |
-| `anomalies` | `user_id` or `"all"`, optional `date_from`, `date_to`, `detectors[]`, `top_n` | `{findings:[{id, detector, user, date, score, rationale, evidence:[{source, record_id}]}], ranking:[{user, score}]}` |
-| `timeline` | `user_id`, `date_from`, `date_to`, `sources[]` | `{events:[{ts, source, record_id, summary}]}` chronological |
-| `case_file` | `user_id`, optional date range | `{user, role, period, findings, timeline, peer_comparison, facts_summary, limitations, disposition:null}` |
-| `record_disposition` | `case_id`, `analyst`, `disposition`, `note`, `confirm` | `{recorded, path, entry}`; rejects unless `confirm=true` |
-
-## SKILL.md outline (`/insider-case`)
-
-1. When to use it, and the facts-not-verdicts boundary, with an explicit ban on HR or disciplinary recommendations.
-2. Workflow: `anomalies(all)` for triage, `baseline` per candidate, `timeline` around top findings, `case_file`, then the narrative.
-3. Narrative rules: every claim cites a record ID, uncertainty is stated, benign explanations are listed beside concerning ones.
-4. Next investigative steps stay on evidence (what else to pull), never on action against the person.
-5. Hand-off: the analyst states a disposition; only then call `record_disposition`.
-6. Failure handling for missing data or empty tool results.
+The data path comes from `EXPOSURE_CASE_DATA` or a server argument; no tool accepts arbitrary file paths.
 
 ## Testing strategy
 
-- **Unit tests per detector (pytest, written first).** Hand-built fixtures; every finding asserts non-empty source record IDs.
-- **Synthetic end-to-end tests.** The generator plants known insiders and decoys, so recall and precision are exact. Also test generator determinism and schema.
-- **MCP contract tests.** An SDK client spawns the stdio server, calls each tool, checks output schemas and clean failure on bad input.
-- **CERT validation (Wed).** Real answer files, with tuning on a held-out split.
-- **Security gate.** gitleaks on every commit; a full-history scan before the Exchange PR.
-- **Demo check.** A case narrative may cite only record IDs that exist in the data.
-- Caveat: synthetic data tests the code, not real-world detection quality.
+- Unit tests per component (pytest, written first) with hand-built fixtures; every cluster asserts non-empty evidence.
+- **Reconciliation test:** each cluster's asset count must match Tenable's plugin-level `count` for the same export. There is no answer key, so this is the trust check.
+- Golden-file tests for the exporters.
+- MCP contract tests: an SDK client spawns the stdio server, calls each tool, checks schemas and clean failure on bad input.
+- Demo check: a narrative may cite only record IDs that exist in the data.
+- Security gate: gitleaks on every commit; a full-history scan before the Exchange PR.
 
 ## Build order
 
-**Mon Nov 2 evening**
-1. [x] Repo, MIT license, `.gitignore`, `.gitattributes`, gitleaks pre-commit hook
-2. [x] `mcp==2.3.0` stdio smoke test, SDK client only
-3. [x] Smoke test from Claude Code itself: `ping` returned `pong` against `mcp==2.3.0`, so the pin stays. `scripts/mcp_smoke.py` deleted; `claude mcp remove insider-smoke` still to run (user)
-4. [x] Schema dataclasses and synthetic generator (test-first)
-5. [x] README skeleton
-6. [ ] Start the CERT download in the background, only after the license check
+**Phase 1: reset (Mon Nov 2 evening)**
+1. [x] Rename package to `exposure_case`, remove insider code/data, generalize `Finding`
+2. [x] Rewrite `CLAUDE.md`, `README.md`, this plan
+3. [x] Save pivot to project memory
+4. [ ] User runs `claude mcp remove insider-smoke` (leftover registration)
 
-**Tue Nov 3 (end-to-end demo by end of day)**
-1. Morning: ingest, baselines, D1, D2, D3, D5, with tests
-2. Midday: `case_file` and `timeline`. Checkpoint: a CLI-driven case for a planted synthetic insider
-3. Afternoon: MCP server with all tools; D4, D6, D7
-4. Evening: SKILL.md v1 and the playbook. Demo runs on synthetic data: Claude Code calls the tools, writes a cited narrative, the analyst records a disposition
+**Phase 2: ingest (test-first)**
+1. [x] `scripts/fetch_tenable.py` (export job, polling, chunks to `data/raw/`; keys from env only); 9 tests with a fake transport
+2. [x] `ingest.py` export reader and plugin-info loader; 20 tests. Full-fleet export fetched and loads in 0.6 s (19,437 records)
+3. [x] `scripts/make_sample.py` and committed `data/sample/` (top 40 plugins by asset count plus 10 notable; biased to common plugins, so only 33 critical findings)
+4. [x] python-reviewer pass on Phase 2 code. Fixed: server-supplied chunk IDs (path traversal), non-dict responses, malformed-record crashes in `make_sample.py` (now reuses the engine parser), invalid UTF-8 / deep-nesting / oversized files, 3.10-safe timestamps with any fraction length, `chunks_failed` detection, cleanup after a partial fetch, API keys hidden from client repr/`vars()`, key validation. Not done on purpose: 429 retry/backoff (single export job), treating duplicate `finding_id` as updates (real export has none), numeric-string ports. 87 tests pass.
 
-**Wed Nov 4 onward (polish)**
-- Subset real CERT; measure recall and precision on the held-out split
-- Add a false-positive case file; polish the disposition log
-- Full-history secret scan, tag v0.1.0, open the Exchange PR (use the `/cyberagents-exchange-submit` skill)
-- Attend Wednesday office hours (see open questions); prepare the 15-minute pitch built around one live case walk-through
+**Phase 3: engine (test-first)**
+1. [ ] Clustering and fleet-share comparison
+2. [ ] Score components, ranking, documented weights
+3. [ ] Per-cluster timeline; reconciliation test against Tenable counts
+
+**Phase 4: case and export**
+1. [ ] Case assembly
+2. [ ] Markdown, CSV, JSON exporters with golden-file tests
+
+**Phase 5: MCP, skill, playbook**
+1. [ ] MCP server with five tools and contract tests
+2. [ ] `SKILL.md` and playbook; demo on the sample data
+
+**Phase 6: polish and submit**
+1. [ ] Full-history secret scan, tag v0.1.0, Exchange PR (use `/cyberagents-exchange-submit`)
+2. [ ] Rehearse the demo; confirm submission details at office hours
 
 ## Risks
 
-- **High:** CERT download size, license and access terms. Mitigation: synthetic-first, so the demo never depends on it.
-- **High:** Scope creep into ML. Mitigation: detectors stay rule-based.
-- **Medium:** The "surveil a third party" Exchange hard line and PII sensitivity. Mitigation: defensive framing, synthetic data, read-only, every data flow documented.
-- **Medium:** Claude Code may not connect to `mcp` 2.3.0. Mitigation: smoke test now; fall back to 1.30.0.
-- **Medium:** Detectors may be weak on some CERT scenarios. Mitigation: report honestly.
+- **High:** the score reads as arbitrary. Mitigation: breakdown, one weights table.
+- **Resolved:** full export size and time (30 s, 108 MB, loads in 0.6 s).
+- **High:** 7,148 clusters, so ranking quality is the product. Mitigation: documented components, hand-checked top 20 against the data.
+- **Medium:** Tenable already ranks by VPR. Lead the demo with clustering, evidence, handoff export and disposition.
+- **Medium:** remediation text may need another endpoint (another outbound call).
+- **Medium:** time; the target is a working demo by the end of Tuesday.
+- **Low:** masked identifiers; treated as opaque.
 
 ## Unverified items (do not assume)
 
 - Official Rules were not read. Open: whether pre-existing code is allowed or work must start during the event; repo-structure, demo-video and pitch-deck requirements; data restrictions; whether all submissions or only winners must be listed on the Exchange.
-- Submission deadline and pitch-selection process. This plan assumes submission on Wednesday; confirm at office hours.
-- Whether a duplicate registration on the SWARM page is harmless.
+- Submission deadline and pitch-selection process; assumed Wednesday, confirm at office hours.
 - The Exchange repo details (`/cyberagents-exchange-submit`, `validator.py` vocabularies) came from the research doc; they were not re-fetched.
-- CERT license, date range, and column and answers layouts (see Data plan).
-- Judging criteria and weights are unpublished. At Black Hat, judges "scored impact above everything else", and winners were deterministic, evidence-attached, read-only and human-decided, with synthetic data.
+- Judging criteria and weights are unpublished. The user's priority is impact on real security work.
+- Tenable items listed under "Tenable data facts".
 
 ## Status (update as work lands)
 
 Last updated: 2026-11-02, Monday evening.
 
-- Done: repo scaffold, MIT license, gitleaks pre-commit hook (ran clean on the first commit); `mcp==2.3.0` SDK-to-SDK stdio smoke test; pins checked against PyPI (`pytest==9.2.0`, `hatchling==1.33.0`).
-- Done: `schema.py` (frozen `Evidence`, `Event`, `Finding`; a Finding needs non-empty evidence and a finite score) and the seeded synthetic generator (`synthetic.py`, `scripts/make_synthetic.py`). 50 users, 6 planted insiders across 3 scenarios (`job_site_exfil`, `usb_file_copy`, `email_exfil`), 2 decoys. The answer key is in `data/synthetic/_labels/answers.csv`, kept apart from the source files; ingest must never read `_labels/`.
-- Done: README skeleton with the Exchange-required sections (several marked TODO). 18 tests pass. python-reviewer found no CRITICAL or HIGH issues; MEDIUM fixes applied.
-- Committed: `d02777b` on `main` (not pushed). `scripts/mcp_smoke.py` was never committed and is now deleted.
-- Done: Claude Code smoke test passed (`ping` returned `pong` on `mcp==2.3.0`); `scripts/mcp_smoke.py` deleted. Remaining: user runs `claude mcp remove insider-smoke`.
-- Not started: CERT license check and download (step 6), detectors, baselines, case assembly, MCP server, skill, playbook, README body.
-- Deferred review items: split `generate()` and group `_baseline_day` parameters into a config object; add a golden-hash determinism test; consider trimming the 2.5 MB committed sample.
-- Generator facts for detector tests: timestamps are ISO (`YYYY-MM-DD HH:MM:SS`), not CERT's `MM/DD/YYYY`, so the real-CERT normalizer is still to write. Insider activity falls in the last 20 workdays. Benign decoys: `U0001` (late-night release engineer), `U0003` (frequent external attachments). Two benign non-insiders also have a roster `end_date`.
+- Done: pivot decided and confirmed (finding-cluster cases, reuse repo, tenant data is fake and usable, live fetch allowed as a documented path).
+- Done: Tenable keys stored in `~/.secrets/tenable.cred.xml` (DPAPI); `tenable-env.ps1` loads them per session. Survey scripts live in the session scratchpad, not the repo.
+- Done (Phase 1): package renamed to `exposure_case`; insider generator, data and tests removed; `Finding` now uses `subject`; 8 tests pass; docs rewritten. Nothing is committed yet.
+- Done (Phase 2): `ingest.py`, `scripts/fetch_tenable.py`, `scripts/make_sample.py`, `data/sample/` (1.3 MB, gitleaks clean). 87 tests pass. The full export lives in `data/raw/full1` (gitignored, about 108 MB). Review findings fixed. Nothing is committed yet.
+- Not started: Phase 3 onward.
 
 ## Resuming in a new session
 
@@ -185,16 +171,10 @@ Last updated: 2026-11-02, Monday evening.
 cd "C:/Users/maupi/Documents/Obsidian Vault/SWARM/insider-case-builder"
 uv sync                      # create .venv with pinned deps (Python >=3.10)
 uv run pytest                # run tests
-uv run pytest tests/test_x.py::test_name   # single test
 ```
 
 - Read `CLAUDE.md`, then this file's Status and Build order. Continue at the first unchecked item.
-- gitleaks is installed via winget (`Gitleaks.Gitleaks`). Shells opened before the install need a restart to see it on PATH. The hook runs `gitleaks git --staged`.
-- `gitleaks dir .` reports 7 false positives inside the gitignored `.venv` (third-party crypto libraries). Ignore them; scan the staged diff or `git` history instead.
-- Claude Code smoke test (run in a prompt, since it edits Claude config), then ask Claude to call `ping`:
-  ```
-  ! claude mcp add insider-smoke -- uv run --directory "C:/Users/maupi/Documents/Obsidian Vault/SWARM/insider-case-builder" python scripts/mcp_smoke.py
-  ```
-  If it connects, keep 2.3.0 and delete `scripts/mcp_smoke.py` and the registration (`claude mcp remove insider-smoke`). If it fails, switch the pin to `mcp==1.30.0`.
-- The research doc lives outside the repo, in the parent folder (`SWARM Global 2026_ Entry Status, Rules, and a Solo Build Plan for a Security Analyst.md`). It is not part of the public repo; keep it out. Read only what a task needs: section 3 (Exchange contribution process) and section 7, Idea 1. It is about 50 KB.
+- To use the Tenable API in PowerShell: `. $HOME\.secrets\tenable-env.ps1` (loads env vars for that session). To re-store keys, run `powershell -File $HOME\.secrets\tenable-store.ps1` in a real terminal, not through `!`.
+- gitleaks is installed via winget (`Gitleaks.Gitleaks`). The hook runs `gitleaks git --staged`. `gitleaks dir .` reports false positives inside the gitignored `.venv`; scan the staged diff or history instead.
+- The research doc lives outside the repo, in the parent folder. Keep it out. Read only section 3 (Exchange contribution process).
 - Workflow reminders: write tests first; run the code-review and security-review agents on new code; commit only when asked.

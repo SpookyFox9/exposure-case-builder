@@ -1,11 +1,10 @@
-# Raw and subset CERT data must never be committed
+# Full Tenable exports must never be committed (only the trimmed data/sample/ is)
 data/raw/
-data/subset/
-data/cert/
 *.zip
 *.tar*
 # Local analyst output
 cases/
+exports/
 dispositions.jsonl
 # Python / env
 .venv/

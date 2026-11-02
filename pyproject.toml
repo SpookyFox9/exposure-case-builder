@@ -1,7 +1,7 @@
 [project]
-name = "insider-case-builder"
+name = "exposure-case-builder"
 version = "0.1.0"
-description = "Vendor-neutral insider-threat case builder: deterministic detectors, a stdio MCP server, and a Claude Code skill."
+description = "Vulnerability exposure case builder: clusters Tenable findings into ranked, evidence-cited cases with a deterministic engine, a stdio MCP server, and a Claude Code skill."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -17,7 +17,7 @@ requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/insider_case"]
+packages = ["src/exposure_case"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

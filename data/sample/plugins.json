@@ -1,0 +1,930 @@
+{
+"vulnerabilities": [
+{
+"accepted_count": 0,
+"count": 119,
+"counts_by_severity": [
+{
+"count": 119,
+"value": 1
+}
+],
+"cvss3_base_score": 4.0,
+"cvss_base_score": 2.1,
+"plugin_family": "General",
+"plugin_id": 10114,
+"plugin_name": "ICMP Timestamp Request Remote Date Disclosure",
+"recasted_count": 0,
+"severity": 1,
+"vpr_score": 3.2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 98,
+"counts_by_severity": [
+{
+"count": 98,
+"value": 2
+}
+],
+"cvss3_base_score": 6.5,
+"cvss_base_score": 6.4,
+"plugin_family": "General",
+"plugin_id": 51192,
+"plugin_name": "SSL Certificate Cannot Be Trusted",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 71,
+"counts_by_severity": [
+{
+"count": 71,
+"value": 2
+}
+],
+"cvss3_base_score": 6.5,
+"cvss_base_score": 6.4,
+"plugin_family": "General",
+"plugin_id": 57582,
+"plugin_name": "SSL Self-Signed Certificate",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 50,
+"counts_by_severity": [
+{
+"count": 50,
+"value": 2
+}
+],
+"cvss3_base_score": 6.5,
+"cvss_base_score": 6.1,
+"plugin_family": "Service detection",
+"plugin_id": 104743,
+"plugin_name": "TLS Version 1.0 Protocol Detection",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 43,
+"counts_by_severity": [
+{
+"count": 43,
+"value": 1
+}
+],
+"cvss3_base_score": 3.7,
+"cvss_base_score": 2.6,
+"plugin_family": "Misc.",
+"plugin_id": 70658,
+"plugin_name": "SSH Server CBC Mode Ciphers Enabled",
+"recasted_count": 0,
+"severity": 1,
+"vpr_score": 3.2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 41,
+"counts_by_severity": [
+{
+"count": 41,
+"value": 1
+}
+],
+"cvss3_base_score": 3.7,
+"cvss_base_score": 2.6,
+"plugin_family": "Misc.",
+"plugin_id": 153953,
+"plugin_name": "SSH Weak Key Exchange Algorithms Enabled",
+"recasted_count": 0,
+"severity": 1,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 41,
+"counts_by_severity": [
+{
+"count": 41,
+"value": 2
+}
+],
+"cvss3_base_score": 7.5,
+"cvss_base_score": 5.0,
+"plugin_family": "General",
+"plugin_id": 42873,
+"plugin_name": "SSL Medium Strength Cipher Suites Supported (SWEET32)",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 5.7,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 39,
+"counts_by_severity": [
+{
+"count": 39,
+"value": 2
+}
+],
+"cvss3_base_score": 6.5,
+"cvss_base_score": 6.1,
+"plugin_family": "Service detection",
+"plugin_id": 157288,
+"plugin_name": "TLS Version 1.1 Deprecated Protocol",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 34,
+"counts_by_severity": [
+{
+"count": 34,
+"value": 1
+}
+],
+"cvss_base_score": 2.6,
+"plugin_family": "Misc.",
+"plugin_id": 71049,
+"plugin_name": "SSH Weak MAC Algorithms Enabled",
+"recasted_count": 0,
+"severity": 1,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 27,
+"counts_by_severity": [
+{
+"count": 27,
+"value": 2
+}
+],
+"cvss3_base_score": 5.9,
+"cvss_base_score": 5.4,
+"plugin_family": "Misc.",
+"plugin_id": 187315,
+"plugin_name": "SSH Terrapin Prefix Truncation Weakness (CVE-2023-48795)",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 5.0,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 25,
+"counts_by_severity": [
+{
+"count": 25,
+"value": 2
+}
+],
+"cvss3_base_score": 5.9,
+"cvss_base_score": 5.0,
+"plugin_family": "General",
+"plugin_id": 65821,
+"plugin_name": "SSL RC4 Cipher Suites Supported (Bar Mitzvah)",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 7.6,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 24,
+"counts_by_severity": [
+{
+"count": 24,
+"value": 2
+}
+],
+"cvss3_base_score": 4.8,
+"cvss_base_score": 4.0,
+"plugin_family": "Misc.",
+"plugin_id": 335161,
+"plugin_name": "OpenSSH < 10.5 Multiple Vulnerabilities",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 2.1,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 24,
+"counts_by_severity": [
+{
+"count": 24,
+"value": 3
+}
+],
+"cvss3_base_score": 9.4,
+"cvss_base_score": 9.7,
+"plugin_family": "Misc.",
+"plugin_id": 326244,
+"plugin_name": "OpenSSH < 10.4 Multiple Vulnerabilities",
+"recasted_count": 0,
+"severity": 3,
+"vpr_score": 4.5,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 24,
+"counts_by_severity": [
+{
+"count": 24,
+"value": 2
+}
+],
+"cvss_base_score": 4.3,
+"plugin_family": "Misc.",
+"plugin_id": 90317,
+"plugin_name": "SSH Weak Algorithms Supported",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 23,
+"counts_by_severity": [
+{
+"count": 23,
+"value": 3
+}
+],
+"cvss3_base_score": 7.8,
+"cvss_base_score": 7.2,
+"plugin_family": "Misc.",
+"plugin_id": 364698,
+"plugin_name": "OpenSSH < 10.6 Multiple Vulnerabilities",
+"recasted_count": 0,
+"severity": 3,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 23,
+"counts_by_severity": [
+{
+"count": 23,
+"value": 3
+}
+],
+"cvss3_base_score": 8.1,
+"cvss_base_score": 7.6,
+"plugin_family": "Misc.",
+"plugin_id": 306743,
+"plugin_name": "OpenSSH < 10.3 Multiple Vulnerabilities",
+"recasted_count": 0,
+"severity": 3,
+"vpr_score": 7.6,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 23,
+"counts_by_severity": [
+{
+"count": 23,
+"value": 2
+}
+],
+"cvss3_base_score": 6.5,
+"cvss_base_score": 5.8,
+"plugin_family": "Firewalls",
+"plugin_id": 50686,
+"plugin_name": "IP Forwarding Enabled",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 6.3,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 22,
+"counts_by_severity": [
+{
+"count": 22,
+"value": 1
+}
+],
+"cvss3_base_score": 3.6,
+"cvss_base_score": 2.4,
+"plugin_family": "Misc.",
+"plugin_id": 269984,
+"plugin_name": "OpenSSH < 10.1 / 10.1p1 Multiple Vulnerabilities",
+"recasted_count": 0,
+"severity": 1,
+"vpr_score": 4.1,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 22,
+"counts_by_severity": [
+{
+"count": 22,
+"value": 1
+}
+],
+"cvss3_base_score": 3.8,
+"cvss_base_score": 2.1,
+"plugin_family": "Misc.",
+"plugin_id": 234554,
+"plugin_name": "OpenSSH < 10.0 DisableForwarding",
+"recasted_count": 0,
+"severity": 1,
+"vpr_score": 1.2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 22,
+"counts_by_severity": [
+{
+"count": 22,
+"value": 2
+}
+],
+"cvss3_base_score": 6.5,
+"cvss_base_score": 5.8,
+"plugin_family": "Misc.",
+"plugin_id": 42263,
+"plugin_name": "Unencrypted Telnet Server",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 21,
+"counts_by_severity": [
+{
+"count": 21,
+"value": 2
+}
+],
+"cvss3_base_score": 5.3,
+"cvss_base_score": 5.0,
+"plugin_family": "General",
+"plugin_id": 15901,
+"plugin_name": "SSL Certificate Expiry",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 20,
+"counts_by_severity": [
+{
+"count": 20,
+"value": 2
+}
+],
+"cvss3_base_score": 6.8,
+"cvss_base_score": 5.8,
+"plugin_family": "Misc.",
+"plugin_id": 159491,
+"plugin_name": "OpenSSH < 8.0",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 5.7,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 20,
+"counts_by_severity": [
+{
+"count": 20,
+"value": 2
+}
+],
+"cvss3_base_score": 5.3,
+"cvss_base_score": 5.0,
+"plugin_family": "General",
+"plugin_id": 35291,
+"plugin_name": "SSL Certificate Signed Using Weak Hashing Algorithm",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 5.7,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 18,
+"counts_by_severity": [
+{
+"count": 18,
+"value": 2
+}
+],
+"cvss3_base_score": 6.5,
+"cvss_base_score": 6.4,
+"plugin_family": "Misc.",
+"plugin_id": 187201,
+"plugin_name": "OpenSSH < 9.6 Multiple Vulnerabilities",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 5.0,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 16,
+"counts_by_severity": [
+{
+"count": 16,
+"value": 3
+}
+],
+"cvss3_base_score": 5.9,
+"cvss_base_score": 7.5,
+"plugin_family": "SNMP",
+"plugin_id": 41028,
+"plugin_name": "SNMP Agent Default Community Name (public)",
+"recasted_count": 0,
+"severity": 3,
+"vpr_score": 2.8,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 15,
+"counts_by_severity": [
+{
+"count": 15,
+"value": 3
+}
+],
+"cvss3_base_score": 9.1,
+"cvss_base_score": 8.3,
+"plugin_family": "Misc.",
+"plugin_id": 326953,
+"plugin_name": "Tenable Nessus Agent < 11.2.1 (TNS-2026-18)",
+"recasted_count": 0,
+"severity": 3,
+"vpr_score": 5.0,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 15,
+"counts_by_severity": [
+{
+"count": 15,
+"value": 2
+}
+],
+"cvss_base_score": 5.0,
+"plugin_family": "SNMP",
+"plugin_id": 76474,
+"plugin_name": "SNMP 'GETBULK' Reflection DDoS",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 3.0,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 15,
+"counts_by_severity": [
+{
+"count": 15,
+"value": 2
+}
+],
+"cvss3_base_score": 5.3,
+"cvss_base_score": 5.0,
+"plugin_family": "Misc.",
+"plugin_id": 57608,
+"plugin_name": "SMB Signing not required",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 15,
+"counts_by_severity": [
+{
+"count": 15,
+"value": 4
+}
+],
+"cvss3_base_score": 9.8,
+"cvss_base_score": 10.0,
+"plugin_family": "Service detection",
+"plugin_id": 20007,
+"plugin_name": "SSL Version 2 and 3 Protocol Detection",
+"recasted_count": 0,
+"severity": 4,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 14,
+"counts_by_severity": [
+{
+"count": 14,
+"value": 3
+}
+],
+"cvss3_base_score": 8.8,
+"cvss_base_score": 7.6,
+"plugin_family": "Windows : Microsoft Bulletins",
+"plugin_id": 166555,
+"plugin_name": "WinVerifyTrust Signature Validation CVE-2013-3900 Mitigation (EnableCertPaddingCheck)",
+"recasted_count": 0,
+"severity": 3,
+"vpr_score": 7.6,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 14,
+"counts_by_severity": [
+{
+"count": 14,
+"value": 2
+}
+],
+"cvss3_base_score": 3.4,
+"cvss_base_score": 4.3,
+"plugin_family": "General",
+"plugin_id": 78479,
+"plugin_name": "SSLv3 Padding Oracle On Downgraded Legacy Encryption Vulnerability (POODLE)",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 3.9,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 14,
+"counts_by_severity": [
+{
+"count": 14,
+"value": 2
+}
+],
+"cvss3_base_score": 4.0,
+"cvss_base_score": 4.3,
+"plugin_family": "Misc.",
+"plugin_id": 58453,
+"plugin_name": "Terminal Services Doesn't Use Network Level Authentication (NLA) Only",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 13,
+"counts_by_severity": [
+{
+"count": 13,
+"value": 1
+}
+],
+"cvss3_base_score": 6.5,
+"cvss_base_score": 2.1,
+"plugin_family": "Windows",
+"plugin_id": 302873,
+"plugin_name": "Windows Speculative Execution Configuration Check - Intel BHI (CVE-2022-0001)",
+"recasted_count": 0,
+"severity": 1,
+"vpr_score": 3.3,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 13,
+"counts_by_severity": [
+{
+"count": 13,
+"value": 2
+}
+],
+"cvss3_base_score": 5.3,
+"cvss_base_score": 5.0,
+"plugin_family": "Misc.",
+"plugin_id": 159490,
+"plugin_name": "OpenSSH < 7.8",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 4.2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 12,
+"counts_by_severity": [
+{
+"count": 12,
+"value": 2
+}
+],
+"cvss3_base_score": 5.3,
+"cvss_base_score": 5.0,
+"plugin_family": "Misc.",
+"plugin_id": 103781,
+"plugin_name": "OpenSSH < 7.6",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 1.2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 12,
+"counts_by_severity": [
+{
+"count": 12,
+"value": 2
+}
+],
+"cvss3_base_score": 5.3,
+"cvss_base_score": 4.3,
+"plugin_family": "General",
+"plugin_id": 26928,
+"plugin_name": "SSL Weak Cipher Suites Supported",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 9,
+"counts_by_severity": [
+{
+"count": 9,
+"value": 1
+}
+],
+"plugin_family": "General",
+"plugin_id": 69551,
+"plugin_name": "SSL Certificate Chain Contains RSA Keys Less Than 2048 bits",
+"recasted_count": 0,
+"severity": 1,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 8,
+"counts_by_severity": [
+{
+"count": 8,
+"value": 2
+}
+],
+"cvss3_base_score": 7.8,
+"cvss_base_score": 6.8,
+"plugin_family": "Windows : Microsoft Bulletins",
+"plugin_id": 341336,
+"plugin_name": "Microsoft .NET Framework (August 2026)",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 4.9,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 8,
+"counts_by_severity": [
+{
+"count": 8,
+"value": 4
+}
+],
+"cvss3_base_score": 9.8,
+"cvss_base_score": 10.0,
+"plugin_family": "Windows : Microsoft Bulletins",
+"plugin_id": 329339,
+"plugin_name": "Security Updates for Microsoft .NET Framework (July 2026)",
+"recasted_count": 0,
+"severity": 4,
+"vpr_score": 6.9,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 8,
+"counts_by_severity": [
+{
+"count": 8,
+"value": 2
+}
+],
+"cvss3_base_score": 7.3,
+"cvss_base_score": 6.8,
+"plugin_family": "Windows : Microsoft Bulletins",
+"plugin_id": 314930,
+"plugin_name": "Security Updates for Microsoft .NET Framework (May 2026)",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 4.5,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 8,
+"counts_by_severity": [
+{
+"count": 8,
+"value": 2
+}
+],
+"cvss3_base_score": 8.2,
+"cvss_base_score": 6.8,
+"plugin_family": "Windows",
+"plugin_id": 310144,
+"plugin_name": "Tenable Nessus Agent < 11.1.3 Arbitrary File Deletion (TNS-2026-12)",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 4.9,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 8,
+"counts_by_severity": [
+{
+"count": 8,
+"value": 2
+}
+],
+"cvss3_base_score": 5.3,
+"cvss_base_score": 5.0,
+"plugin_family": "General",
+"plugin_id": 45411,
+"plugin_name": "SSL Certificate with Wrong Hostname",
+"recasted_count": 0,
+"severity": 2,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 7,
+"counts_by_severity": [
+{
+"count": 7,
+"value": 2
+}
+],
+"cvss3_base_score": 6.5,
+"cvss_base_score": 5.4,
+"plugin_family": "Windows",
+"plugin_id": 132101,
+"plugin_name": "Windows Speculative Execution Configuration Check",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 7.8,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 7,
+"counts_by_severity": [
+{
+"count": 7,
+"value": 3
+}
+],
+"plugin_family": "Windows",
+"plugin_id": 103569,
+"plugin_name": "Windows Defender Antimalware/Antivirus Signature Definition Check",
+"recasted_count": 0,
+"severity": 3,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 6,
+"counts_by_severity": [
+{
+"count": 6,
+"value": 2
+}
+],
+"cvss3_base_score": 5.7,
+"cvss_base_score": 6.8,
+"plugin_family": "Windows : Microsoft Bulletins",
+"plugin_id": 271264,
+"plugin_name": "Security Updates for Microsoft .NET Framework (October 2025)",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 3.0,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 6,
+"counts_by_severity": [
+{
+"count": 6,
+"value": 4
+}
+],
+"cvss3_base_score": 8.8,
+"cvss_base_score": 10.0,
+"plugin_family": "Windows : Microsoft Bulletins",
+"plugin_id": 214274,
+"plugin_name": "Security Updates for Microsoft .NET Framework (January 2025)",
+"recasted_count": 0,
+"severity": 4,
+"vpr_score": 4.9,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 6,
+"counts_by_severity": [
+{
+"count": 6,
+"value": 3
+}
+],
+"cvss3_base_score": 7.5,
+"cvss_base_score": 7.8,
+"plugin_family": "Windows : Microsoft Bulletins",
+"plugin_id": 208757,
+"plugin_name": "Security Updates for Microsoft .NET Framework (October 2024)",
+"recasted_count": 0,
+"severity": 3,
+"vpr_score": 3.0,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 5,
+"counts_by_severity": [
+{
+"count": 5,
+"value": 2
+}
+],
+"cvss3_base_score": 7.3,
+"cvss_base_score": 6.8,
+"plugin_family": "Windows : Microsoft Bulletins",
+"plugin_id": 202304,
+"plugin_name": "Security Updates for Microsoft .NET Framework (July 2024)",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 4.9,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 5,
+"counts_by_severity": [
+{
+"count": 5,
+"value": 2
+}
+],
+"cvss3_base_score": 6.1,
+"cvss_base_score": 4.3,
+"plugin_family": "CGI abuses : XSS",
+"plugin_id": 136929,
+"plugin_name": "JQuery 1.2 < 3.5.0 Multiple XSS",
+"recasted_count": 0,
+"severity": 2,
+"vpr_score": 5.1,
+"vulnerability_state": "Active"
+},
+{
+"accepted_count": 0,
+"count": 5,
+"counts_by_severity": [
+{
+"count": 5,
+"value": 4
+}
+],
+"cvss3_base_score": 9.8,
+"cvss_base_score": 10.0,
+"plugin_family": "Gain a shell remotely",
+"plugin_id": 77823,
+"plugin_name": "Bash Remote Code Execution (Shellshock)",
+"recasted_count": 0,
+"severity": 4,
+"vpr_score": 9.6,
+"vulnerability_state": "Active"
+}
+]
+}

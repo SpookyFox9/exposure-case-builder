@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Read `docs/PLAN.md` first. It has the full plan, the decisions already made, the build order with checkboxes, current status, and resume instructions. Continue from the first unchecked item. Update its Status section as work lands.
 
-Insider Threat Case Builder baselines each user's activity against their peers, uses rule-based detectors to flag deviations, and assembles a case file with a timeline and the source records behind every finding. Claude writes the narrative and the human analyst records the disposition. It is being built for SWARM Global (Nov 2–6, 2026) and will be listed on the CyberAgents Exchange.
+Exposure Case Builder turns Tenable vulnerability findings into **cases, one per finding cluster** (one vulnerability across many assets), ranked so a human can see what to fix first. Each case carries the evidence and an export (Markdown, CSV, JSON) an engineer on another team can act on. Claude writes the narrative and the human analyst records the disposition. It is being built for SWARM Global (Nov 2-6, 2026) and will be listed on the CyberAgents Exchange.
+
+History: the project started as an insider-threat case builder (CERT data) and pivoted on 2026-11-02 because the competition tenant has no user-activity telemetry. The insider code is in git history (commit `56f8788` and earlier). The directory name `insider-case-builder/` is a leftover; the package is `exposure_case`.
 
 ## Commands
 
@@ -16,28 +18,28 @@ Python >=3.10 is required (the machine's default `python` is 3.9; use `uv`).
 uv sync                                    # create .venv with pinned deps
 uv run pytest                              # all tests
 uv run pytest tests/test_x.py::test_name   # single test
-uv run python scripts/mcp_smoke.py         # throwaway MCP stdio smoke server (delete after the Claude Code check)
 ```
 
 There is no lint or build command yet; add them here when they exist.
 
 ## Architecture
 
-A deterministic stdlib-only engine (`src/insider_case/`: ingest, baseline, detectors, case assembly, disposition log) wrapped by a thin stdio MCP server (`server.py`), plus a Claude Code skill (`skills/insider-case/SKILL.md`) and a playbook that chain the tools. Code scores and collects evidence, Claude narrates, the human decides. Tool schemas, detector definitions and the SKILL.md outline are in `docs/PLAN.md`.
+A deterministic stdlib-only engine (`src/exposure_case/`: ingest, clustering, scoring, case assembly, export, disposition log) wrapped by a thin stdio MCP server (`server.py`), plus a Claude Code skill (`skills/exposure-case/SKILL.md`) and a playbook that chain the tools. Code clusters, scores and collects evidence, Claude narrates, the human decides. Tool schemas and the scoring table are in `docs/PLAN.md`.
 
 The MCP server uses `mcp==2.3.0`. In 2.x, `FastMCP` was renamed: use `from mcp.server.mcpserver import MCPServer`. Older tutorials will not work.
 
 ## Hard rules
 
-- Every finding must carry the source records that triggered it.
-- Output is evidence and facts, not verdicts. No HR or disciplinary recommendations anywhere (code, prompts, skill text).
-- Read-only by default. The only write is `record_disposition`: a local append-only JSONL log that requires `confirm=true`. No tool changes any external system.
-- No outbound network calls unless documented in the README. The CERT download script is the one planned exception.
-- Synthetic or public data only. Never reference any employer or any real organization's data, policies, field names or detection content.
-- Never commit raw CERT dataset files (`data/raw/`, `data/subset/` are gitignored). Ship the download script and a small synthetic sample.
-- Detectors are rule-based and unit-tested. No ML. Prefer the standard library; justify each third-party dependency; pin every dependency (`mcp` is the only runtime dependency).
+- Every finding and every cluster number must trace to source records (`finding_id` + `scan.uuid`).
+- Output is evidence and facts, not verdicts. No recommendation may target a person. Remediation guidance is allowed only when sourced from Tenable plugin data and labelled as such.
+- The score is a transparent weighted sum with its component breakdown shown. Weights live in one documented table. No ML.
+- Read-only by default. Writes are local only: `record_disposition` (append-only JSONL, requires `confirm=true`) and `export_case` file output (fixed output directory, requires `confirm=true`). No tool changes any external system.
+- The one outbound network path is `scripts/fetch_tenable.py` (reads Tenable, creates an export job, writes to `data/raw/`). It is documented in the README data flows. The engine itself never calls the network.
+- Data is the competition tenant: fake and masked. Treat IPs, hostnames and similar fields as opaque identifiers; never run OSINT on them (results are guaranteed misleading). Commit only a small trimmed sample in `data/sample/`; `data/raw/` (full exports) is gitignored.
+- API keys come from env vars `TENABLE_ACCESS_KEY` / `TENABLE_SECRET_KEY` only, loaded from a vault outside the repo (`~/.secrets/`, DPAPI-encrypted). Never write keys to the repo, logs or tool output.
+- Prefer the standard library; justify each third-party dependency; pin every dependency (`mcp` is the only runtime dependency).
 - A committed credential is an automatic Exchange rejection even if rotated. The `.githooks/pre-commit` gitleaks hook is on (`core.hooksPath` is set to `.githooks`); never bypass it. `gitleaks dir .` shows false positives inside `.venv`; scan the staged diff or history instead.
 
 ## Reference
 
-The event and Exchange research doc is outside this repo, in the parent folder (`../SWARM Global 2026_ Entry Status, Rules, and a Solo Build Plan for a Security Analyst.md`). Keep it out of the public repo. Read only the section a task needs, mainly section 3 (Exchange contribution process) and section 7, Idea 1. Items marked unverified there are unverified. Check installed package versions rather than trusting version numbers in it.
+The event and Exchange research doc is outside this repo, in the parent folder (`../SWARM Global 2026_ Entry Status, Rules, and a Solo Build Plan for a Security Analyst.md`). Keep it out of the public repo. Read only the section a task needs, mainly section 3 (Exchange contribution process). Its Idea 1 (insider threat) is superseded by this pivot. Items marked unverified there are unverified. Check installed package versions rather than trusting version numbers in it.

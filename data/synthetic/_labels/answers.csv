@@ -1,9 +1,0 @@
-user_id,label,scenario,start,end
-U0017,insider,job_site_exfil,2026-03-09,2026-04-03
-U0010,insider,job_site_exfil,2026-03-09,2026-04-03
-U0002,insider,usb_file_copy,2026-03-09,2026-04-03
-U0049,insider,usb_file_copy,2026-03-09,2026-04-03
-U0032,insider,email_exfil,2026-03-09,2026-04-03
-U0016,insider,email_exfil,2026-03-09,2026-04-03
-U0001,decoy,late_night_release,2026-01-05,2026-04-03
-U0003,decoy,frequent_external_attachments,2026-01-05,2026-04-03
