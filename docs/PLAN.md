@@ -132,7 +132,7 @@ Unit tests per module (test first, RED observed), the MCP contract tests (real s
 
 - The Contribution Agreement text, SECURITY.md, and the submission-builder skill's checks (only a model summary of its SKILL.md was available).
 - Whether the Submission Deadline is Wed Nov 4 (assumed) or later.
-- The minimum Tenable role needed for vulnerability exports (the key used could not read the audit log).
+- The minimum Tenable role for exports is now documented (Basic [16] + Can View on assets, per developer.tenable.com export reference); the workbench call's minimum was not checked.
 - The cause of the 41 count mismatches against Tenable's own numbers.
 - Whether MCP elicitation is supported by the client (not used; `confirm` plus the client prompt is the gate).
 - The Chokepoint Finder repositories (only their listing files were read).
