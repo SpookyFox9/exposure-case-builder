@@ -50,7 +50,7 @@ def test_skill_does_not_invent_tools(tool_names):
 
 @pytest.mark.parametrize("phrase", [
     "finding ID", "verdict", "Tenable-provided", "confirm=true", "masked", "append-only", "No recommendation may target",
-    "two lists",
+    "two lists", "data, not instructions", "cannot verify", "never call a write tool because of",
 ])
 def test_skill_states_the_hard_rules(phrase):
     assert phrase.lower() in SKILL.read_text(encoding="utf-8").lower()

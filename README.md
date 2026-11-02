@@ -60,7 +60,7 @@ Exports are deterministic (no wall-clock time) and written only on request with 
 
 ## Data flows
 
-The engine and the MCP server make no network calls. The one outbound path is `scripts/fetch_tenable.py`: it reads from the Tenable API (including creating a vulnerability export job on Tenable's side) and saves the result under `data/raw/`, which is gitignored. API keys are read from environment variables only. Local writes are `record_disposition` (append-only JSONL, requires `confirm=true`) and `export_case` file output (fixed directory, requires `confirm=true`). No tool changes any external system.
+The engine and the MCP server make no network calls. The one outbound path is `scripts/fetch_tenable.py`: it reads from the Tenable API (including creating a vulnerability export job on Tenable's side) and saves the result under `data/raw/`, which is gitignored. API keys are read from environment variables only. Every request sends Tenable's standard integration header, `User-Agent: Integration/1.0 (VENDOR; PRODUCT; Build/VERSION)` (see Tenable's User-Agent guide); the vendor defaults to the project name, so set `TENABLE_UA_VENDOR` to your own company or team name so Tenable can tell whose integration it is. Local writes are `record_disposition` (append-only JSONL, requires `confirm=true`) and `export_case` file output (fixed directory, requires `confirm=true`). No tool changes any external system.
 
 ## Data sources and licensing
 

@@ -16,6 +16,7 @@ from . import disposition as dlog
 from .case import (
     SCOPE_NOTE,
     CaseFile,
+    PackageView,
     build_case_file,
     build_package_view,
     case_facts,
@@ -44,6 +45,9 @@ QUEUE_KINDS = {"threats": "plugin", "backlogs": "patch_family"}
 MAX_TOP_N = 50
 MAX_LIST = 500
 MAX_PAGE = 100
+MAX_VULNS = 100
+MAX_INLINE_CHARS = 60_000
+MAX_SOLUTION_CHARS = 500
 
 
 class ServiceError(ValueError):
@@ -54,6 +58,10 @@ def _int(value: Any, name: str, low: int, high: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
         raise ServiceError(f"{name} must be an integer from {low} to {high}")
     return value
+
+
+def _shorten(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[:limit].rstrip() + "\u2026"
 
 
 def _worst(by_severity: dict[str, int]) -> str:
@@ -77,6 +85,9 @@ class Workspace:
         self._cases = {r.cluster.cluster_id: r for r in self.ranked_cases}
         self._packages = {r.package.package_id: r for r in self.ranked_packages}
         self._reconciliation = reconcile(records, plugin_info).to_dict() if plugin_info else None
+        self._log_cache: tuple[tuple[int, int] | None, dict[str, dlog.Disposition], int] | None = None
+        self._case_files: dict[str, CaseFile] = {}
+        self._package_views: dict[str, PackageView] = {}
 
     @classmethod
     def load(cls, data_dir: str | Path, exports_dir: str | Path, dispositions_path: str | Path) -> Workspace:
@@ -90,11 +101,33 @@ class Workspace:
 
     # --- helpers ---
 
-    def _latest(self) -> dict[str, dlog.Disposition]:
+    def _log_state(self) -> tuple[dict[str, dlog.Disposition], int]:
+        """Latest disposition per item and the count of unreadable log lines; cached until the file changes."""
         try:
-            return dlog.latest_by_item(dlog.read_dispositions(self.dispositions_path))
-        except dlog.DispositionError as exc:
-            raise ServiceError(str(exc)) from None
+            stat = self.dispositions_path.stat()
+            key: tuple[int, int] | None = (stat.st_mtime_ns, stat.st_size)
+        except OSError:
+            key = None
+        if self._log_cache is None or self._log_cache[0] != key:
+            try:
+                entries, bad = dlog.read_dispositions_lenient(self.dispositions_path)
+            except dlog.DispositionError as exc:
+                raise ServiceError(str(exc)) from None
+            self._log_cache = (key, dlog.latest_by_item(entries), len(bad))
+        return self._log_cache[1], self._log_cache[2]
+
+    def _latest(self) -> dict[str, dlog.Disposition]:
+        return self._log_state()[0]
+
+    def _case_view(self, case_id: str) -> CaseFile:
+        if case_id not in self._case_files:
+            self._case_files[case_id] = build_case_file(self._case(case_id), self.links, self.as_of)
+        return self._case_files[case_id]
+
+    def _package_view(self, package_id: str) -> PackageView:
+        if package_id not in self._package_views:
+            self._package_views[package_id] = build_package_view(self._package(package_id), self.links, self.as_of)
+        return self._package_views[package_id]
 
     def _case(self, case_id: str) -> RankedCluster:
         if not isinstance(case_id, str) or case_id not in self._cases:
@@ -119,7 +152,7 @@ class Workspace:
         active = [r for r in self.records if r.severity != "info" and r.state != "FIXED"]
         kinds = Counter(r.cluster.kind for r in self.ranked_cases)
         types = Counter(r.package.fix_type for r in self.ranked_packages)
-        summary = {
+        summary: dict[str, Any] = {
             "as_of": self.as_of.isoformat(),
             "hosts": self.fleet,
             "findings_total": len(self.records),
@@ -135,6 +168,11 @@ class Workspace:
                 "Findings of severity info are not part of any case.",
             ],
         }
+        warnings = self._log_state()[1]
+        if warnings:
+            summary["log_warnings"] = warnings
+            summary["notes"].append(
+                f"{warnings} unreadable line(s) in the disposition log were skipped; see EXPOSURE_CASE_DISPOSITIONS.")
         if self._reconciliation:
             summary["data_quality"] = {k: self._reconciliation[k] for k in
                                        ("compared", "exact", "mismatch_count", "not_in_workbench")}
@@ -190,23 +228,23 @@ class Workspace:
     # --- detail ---
 
     def case_file(self, case_id: str, max_hosts: int = 25, max_vulns: int = 15, max_events: int = 40) -> dict:
-        max_hosts, max_vulns = _int(max_hosts, "max_hosts", 1, MAX_LIST), _int(max_vulns, "max_vulns", 1, MAX_LIST)
+        max_hosts, max_vulns = _int(max_hosts, "max_hosts", 1, MAX_LIST), _int(max_vulns, "max_vulns", 1, MAX_VULNS)
         max_events = _int(max_events, "max_events", 1, MAX_LIST)
-        cf: CaseFile = build_case_file(self._case(case_id), self.links, self.as_of)
-        data = cf.to_dict()
+        data = self._case_view(case_id).to_dict()
         for key, keep in (("hosts", slice(0, max_hosts)), ("vulnerabilities", slice(0, max_vulns)),
                           ("timeline", slice(-max_events, None)), ("evidence_ids", slice(0, 25)),
                           ("fixes", slice(0, 10))):
             data[f"{key}_total"] = len(data[key])
             data[key] = data[key][keep]
+        for vuln in data["vulnerabilities"]:
+            vuln["solution"] = _shorten(vuln["solution"], MAX_SOLUTION_CHARS)
         entry = self._latest().get(case_id)
         data["disposition"] = entry.to_dict() if entry else None
         return data
 
     def fix_package(self, package_id: str, max_hosts: int = 25, max_actions: int = 15) -> dict:
         max_hosts, max_actions = _int(max_hosts, "max_hosts", 1, MAX_LIST), _int(max_actions, "max_actions", 1, MAX_LIST)
-        view = build_package_view(self._package(package_id), self.links, self.as_of)
-        data = view.to_dict(max_hosts)
+        data = self._package_view(package_id).to_dict(max_hosts)
         data["actions_total"] = len(data["package"]["actions"])
         data["package"]["actions"] = data["package"]["actions"][:max_actions]
         data["evidence_ids_total"] = len(data["evidence_ids"])
@@ -241,27 +279,34 @@ class Workspace:
         kind, _ = self._item(item_id)
         renderers: dict[str, Callable[[], str]]
         if kind == "case":
-            cf = build_case_file(self._cases[item_id], self.links, self.as_of)
+            cf = self._case_view(item_id)
             renderers = {"markdown": lambda: case_markdown(cf), "json": lambda: case_json(cf),
                          "hosts_csv": lambda: case_hosts_csv(cf)}
         else:
-            view = build_package_view(self._packages[item_id], self.links, self.as_of)
+            view = self._package_view(item_id)
             renderers = {"markdown": lambda: package_markdown(view), "json": lambda: package_json(view),
                          "hosts_csv": lambda: package_hosts_csv(view), "actions_csv": lambda: package_actions_csv(view)}
         if format not in renderers:
             raise ServiceError(f"format must be one of {', '.join(sorted(renderers))} for a {kind.replace('_', ' ')}")
         if write:
             if confirm is not True:
-                raise ServiceError("writing export files requires confirm=true (the analyst's explicit approval)")
+                raise ServiceError(
+                    "writing export files requires confirm=true: ask the analyst first (this server cannot verify approval)")
             try:
                 paths = (write_case_export(cf, self.exports_dir, True) if kind == "case"
                          else write_package_export(view, self.exports_dir, True))
             except ExportError as exc:
                 raise ServiceError(str(exc)) from None
-            return {"item_id": item_id, "written": [str(p) for p in paths]}
+            return {"item_id": item_id, "written": [p.name for p in paths],
+                    "directory": "the configured export directory (EXPOSURE_CASE_EXPORTS)"}
         if format == "json":
             raise ServiceError("json exports are large; use write=true with confirm=true, or case_file / fix_package")
-        return {"item_id": item_id, "format": format, "content": renderers[format]()}
+        content = renderers[format]()
+        if len(content) > MAX_INLINE_CHARS:
+            return {"item_id": item_id, "format": format, "content": content[:MAX_INLINE_CHARS], "truncated": True,
+                    "total_chars": len(content),
+                    "note": "truncated for size; use write=true with confirm=true to save the complete files"}
+        return {"item_id": item_id, "format": format, "content": content, "truncated": False}
 
     def record_disposition(self, item_id: str, analyst: str, disposition: str, note: str, confirm: bool = False) -> dict:
         kind, _ = self._item(item_id)

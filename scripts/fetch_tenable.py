@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import argparse
 import http.client
+import importlib.metadata
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -51,22 +53,58 @@ def keys_from_env() -> tuple[str, str]:
     return values[0], values[1]
 
 
+DEFAULT_VENDOR = "Exposure Case Builder open source"
+DEFAULT_PRODUCT = "ExposureCaseBuilder"
+_UNSAFE_UA_TEXT = re.compile(r"[;()\x00-\x1f\x7f]")
+_UNSAFE_UA_BUILD = re.compile(r"[^0-9A-Za-z.+-]")
+
+
+def _ua_text(value: str | None, default: str, limit: int = 60) -> str:
+    """One User-Agent attribute: no ';', parentheses or control characters, bounded, never empty."""
+    cleaned = " ".join(_UNSAFE_UA_TEXT.sub(" ", value or "").split())[:limit].strip()
+    return cleaned or default
+
+
+def _package_version() -> str:
+    try:
+        return importlib.metadata.version("exposure-case-builder")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.1.0"
+
+
+def user_agent(vendor: str | None = None, product: str | None = None, build: str | None = None) -> str:
+    """Tenable's standard integration header: ``Integration/1.0 (VENDOR; PRODUCT; Build/VERSION)``.
+
+    See https://developer.tenable.com/docs/user-agent-header. Set ``TENABLE_UA_VENDOR`` to your own company or
+    team name so Tenable can tell whose integration this is; it defaults to the project name.
+    """
+    vendor_text = _ua_text(vendor if vendor is not None else os.environ.get("TENABLE_UA_VENDOR"), DEFAULT_VENDOR)
+    product_text = _ua_text(product, DEFAULT_PRODUCT)
+    build_text = _UNSAFE_UA_BUILD.sub("", build if build is not None else _package_version())[:30] or "0"
+    return f"Integration/1.0 ({vendor_text}; {product_text}; Build/{build_text})"
+
+
 class TenableClient:
     """Holds the API keys privately: no __dict__, and a fixed repr that never shows them."""
 
-    __slots__ = ("_auth", "_opener")
+    __slots__ = ("_auth", "_opener", "_user_agent")
 
-    def __init__(self, access_key: str, secret_key: str, opener: Callable[..., Any] = urllib.request.urlopen):
+    def __init__(self, access_key: str, secret_key: str, opener: Callable[..., Any] = urllib.request.urlopen,
+                 agent: str | None = None):
         self._auth = f"accessKey={access_key};secretKey={secret_key}"
         self._opener = opener
+        self._user_agent = agent or user_agent()
 
     def __repr__(self) -> str:
         return "TenableClient(<credentials hidden>)"
 
+    def _headers(self) -> dict[str, str]:
+        return {"X-ApiKeys": self._auth, "User-Agent": self._user_agent, "Accept": "application/json",
+                "Content-Type": "application/json"}
+
     def request(self, method: str, path: str, body: dict | None = None) -> Any:
         data = json.dumps(body).encode("utf-8") if body is not None else None
-        headers = {"X-ApiKeys": self._auth, "Accept": "application/json", "Content-Type": "application/json"}
-        req = urllib.request.Request(BASE_URL + path, data=data, headers=headers, method=method)
+        req = urllib.request.Request(BASE_URL + path, data=data, headers=self._headers(), method=method)
         try:
             with self._opener(req, timeout=REQUEST_TIMEOUT_S) as resp:
                 return json.load(resp)

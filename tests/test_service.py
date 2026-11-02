@@ -211,7 +211,7 @@ def test_export_write_requires_confirm(ws, tmp_path):
 def test_export_write_creates_the_files(ws, tmp_path):
     out = ws.export(first_case(ws), "markdown", write=True, confirm=True)
     assert len(out["written"]) >= 3
-    assert all(Path(p).parent == (tmp_path / "exports").resolve() and Path(p).exists() for p in out["written"])
+    assert all((tmp_path / "exports" / name).exists() for name in out["written"])
 
 
 # --- dispositions ---

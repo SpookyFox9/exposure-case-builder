@@ -9,16 +9,17 @@ tells you how to set it up, run a triage session and share the results.
 2. Store your Tenable API keys outside the repo (read-only keys). On Windows the repo's helper scripts keep them
    DPAPI-encrypted under `~/.secrets/`; load them per session with `. ~/.secrets/tenable-env.ps1`. The keys live
    in `TENABLE_ACCESS_KEY` / `TENABLE_SECRET_KEY` and are never written to the repo.
-3. Fetch an export (the one outbound network call in the project):
+3. Optional but recommended: set `TENABLE_UA_VENDOR` to your company or team name. Tenable asks integrations to identify themselves with `User-Agent: Integration/1.0 (VENDOR; PRODUCT; Build/VERSION)`; the script sends it on every call, and the vendor otherwise defaults to the project name.
+4. Fetch an export (the one outbound network call in the project):
    `uv run python scripts/fetch_tenable.py --out data/raw/<name>`. About 30 seconds and 100 MB for 160 hosts.
    `data/raw/` is gitignored.
-4. Register the MCP server with Claude Code (this edits your Claude config, so you run it):
+5. Register the MCP server with Claude Code (this edits your Claude config, so you run it):
    ```
    claude mcp add exposure-case --env EXPOSURE_CASE_DATA=<absolute path to data/raw/<name>> -- uv run --directory <absolute path to this repo> python -m exposure_case.server
    ```
    Check `claude mcp add --help` if your version orders the flags differently. To try it without a Tenable
    account, point `EXPOSURE_CASE_DATA` at `data/sample` (a trimmed, fake, masked sample).
-5. Copy `skills/exposure-case` to `~/.claude/skills/` (or your project's `.claude/skills/`).
+6. Copy `skills/exposure-case` to `~/.claude/skills/` (or your project's `.claude/skills/`).
 
 Optional settings: `EXPOSURE_CASE_EXPORTS` (default `./exports`) and `EXPOSURE_CASE_DISPOSITIONS` (default
 `./dispositions.jsonl`). Both are gitignored.
@@ -67,7 +68,15 @@ Optional settings: `EXPOSURE_CASE_EXPORTS` (default `./exports`) and `EXPOSURE_C
 | Queue looks empty with `hide_dispositioned` | Everything shown has a recorded decision; turn the filter off. |
 | Tool says "unknown case_id" | Ids change with the data. Re-run `case_queue` and use an id from it. |
 
-## 6. Data flows
+## 6. What protects the writes
+
+`confirm=true` is something Claude passes, not proof that you agreed: the server cannot tell the difference. The
+real gate is your client's tool-permission prompt. In Claude Code, leave `export` and `record_disposition` on
+"ask" (do not allow-list them) so you see every write before it happens. Tenable text (plugin names, solution
+text, hostnames) is untrusted and could contain instructions aimed at the model; the server and the skill tell
+Claude to treat it as data, but the permission prompt is what stops a mistake.
+
+## 7. Data flows
 
 The server reads the saved export and makes no network calls. The only outbound call is `scripts/fetch_tenable.py`
 (reads from Tenable; creates an export job on Tenable's side). The only local writes are export files (fixed
