@@ -13,6 +13,10 @@ An analyst should not have to combine dozens of per-asset reports to learn which
 
 Output is evidence and facts, not verdicts, and nothing in it recommends action against a person. Every number traces to source finding IDs. Scoring is a fixed weighted sum with the component breakdown shown for every case; there is no machine learning.
 
+## Related work
+
+Tenable's Exchange already has tools in this space, and this project does not claim to be the first. **Patch Shepherd** clusters findings into remediation campaigns by shared solution text; the vetted **Remediation Priority & Impact Agent** produces a ranked fix list with tickets; the **Chokepoint Finder** family searches for the shortest ordered set of fixes. What is different here: two linked views of the same findings (risk *cases* and fix *packages* keyed by CPE product and kind of fix, each finding in exactly one of each), a queue that keeps single-vulnerability *threats* separate from patch-family *backlogs*, a deterministic standard-library engine behind a gated MCP server, and a local append-only decision log. Details and the comparison are in `docs/PRIOR_ART.md`; the design is in `docs/architecture.md`.
+
 ## Prerequisites
 
 - Python 3.10 or newer and [`uv`](https://docs.astral.sh/uv/)
@@ -22,8 +26,8 @@ Output is evidence and facts, not verdicts, and nothing in it recommends action 
 ## How to run
 
 ```bash
-uv sync
-uv run pytest        # confirms the install; the MCP contract tests start the real server on the sample
+uv sync --frozen    # exact versions from uv.lock
+uv run pytest        # confirms the install; the contract tests start the real server on the sample
 ```
 
 Try it on the committed sample (fake, masked tenant data; no Tenable account needed):
@@ -69,15 +73,15 @@ Dispositions (`assigned`, `risk-accepted`, `false-positive`, `needs-info`) are o
 
 ## Known limitations
 
-- **The ranking is a judgment, not a validated model.** The weights (severity 30, exploit 25, breadth 15, volume 10, age 5, unsupported 5, recurrence 5, patch 5) are documented and adjustable in `scoring.py`, but nothing here tests them against real outcomes. CISA KEV is common in the sample tenant (793 of 10,283 active findings), so large patch families score high on the exploit component; the two-list queue exists for that reason.
+- **The ranking is a judgment, not a validated model.** The weights (severity 30, exploit 25, breadth 15, volume 10, age 5, unsupported 5, recurrence 5, patch 5) are documented and adjustable in `scoring.py`, but nothing here tests them against real outcomes. CISA KEV is common in this tenant (793 of 10,283 active findings *(private export)*), so large patch families score high on the exploit component; the two-list queue exists for that reason.
 - **Fix grouping is heuristic.** A package is a product (the first CPE's vendor and product) plus a fix type read from the opening verb of Tenable's solution text. Tenable's solution text is often generic ("Update the affected packages."), a few plugins have no CPE (they become their own package), and some products list dozens of separate actions that a human can see are cumulative (for example "Upgrade to OpenSSH 10.3 or later" through "10.6 or later"). The tool lists them as given rather than guessing at supersession.
 - **Near-duplicate cases remain.** Plugins for the same product on the same hosts (for example several Oracle Java CPU releases) are separate cases. The fix view rolls them up; the case view does not.
 - **The timeline is thin.** The export has first-found and last-found dates for every finding, but Tenable's own fixed and reopened dates for only a small minority.
-- **Counts agree with Tenable, with a known gap.** On the sample tenant 4,636 of 4,677 comparable plugins (99.1%) match Tenable's own plugin counts (as distinct hosts or finding instances). The other 41 all have the export below Tenable's number; the cause is unverified.
+- **Counts agree with Tenable, with a known gap.** On the competition tenant 4,636 of 4,677 comparable plugins (99.1%) *(private export)* match Tenable's own plugin counts (as distinct hosts or finding instances). The other 41 all have the export below Tenable's number; the cause is unverified.
 - **Findings of severity info are not part of any case.**
 - **No owner or team field.** The tenant has no tags and two groups, so a case cannot say who owns a host; host tables show host, IP, OS and counts.
-- **Scope.** Tenable Vulnerability Management (cloud.tenable.com) only; Tenable Security Center and Nessus are not supported. Tested on one tenant (160 hosts, 19,437 findings: about 108 MB fetched in 30 seconds, loaded in under a second, 815 cases and 200 packages built in about one second). Larger tenants are untested; each export chunk is limited to 256 MB.
-- **Developed and tested on Windows 11.** The code is portable Python, but other platforms are untested (one symlink test is skipped on Windows).
+- **Scope.** Tenable Vulnerability Management (cloud.tenable.com) only; Tenable Security Center and Nessus are not supported. Tested on one tenant *(private export)* (160 hosts, 19,437 findings: about 108 MB fetched in 30 seconds, loaded in under a second, 815 cases and 200 packages built in about one second). Larger tenants are untested; each export chunk is limited to 128 MB and a whole export to 1 GB.
+- **Python and platforms.** The full suite passes on Python 3.10 and 3.14, and CI runs 3.10 and 3.12 on Linux. It was developed on Windows 11 (one symlink test is skipped there); macOS is untested. Figures marked *(private export)* were measured on the competition tenant's full export (160 hosts, 19,437 findings, about 108 MB), which is not committed and so cannot be reproduced from this repository; the committed sample (`data/sample`) is a trimmed subset of it.
 - **Narratives are Claude's.** The engine is deterministic; the cited narrative that Claude writes from it is not, and it is only as good as the skill and the analyst's review.
 - Hostnames and IPs in the competition data are masked and are treated as opaque identifiers.
 
@@ -108,6 +112,16 @@ Every outbound destination, scope and state-changing action:
 
 ## Data sources and licensing
 
-- **Tenable competition tenant:** fake, masked data provided for the SWARM Global competition. A small trimmed sample is committed in `data/sample/` (1,125 findings, 154 hosts, 50 plugins; fake and masked, with long plugin output truncated); full exports are never committed.
+- **Tenable competition tenant:** fake, masked data provided for the SWARM Global competition. A small trimmed sample is committed in `data/sample/` (1,125 findings, 154 hosts, 50 plugins; fake and masked, with plugin output removed because it can contain personal data); full exports are never committed.
 - **Code:** MIT, see `LICENSE`.
 - **Dependencies (both MIT, both pinned):** `mcp==2.3.0` is the only runtime dependency, needed to speak the Model Context Protocol over stdio; `pytest==9.2.0` is dev-only. The engine itself uses only the Python standard library. Lint, type and coverage checks (`ruff`, `mypy`, `coverage`) are run on demand and are not project dependencies.
+
+## Development
+
+```bash
+uv sync --frozen
+git config core.hooksPath .githooks   # once per clone: secret scan plus every quality gate on each commit
+sh scripts/check_all.sh               # ruff, black, mypy, bandit, the standards checker, and tests with an 80% coverage gate
+```
+
+The same script runs in CI. `scripts/check_standards.py` enforces file size, function length, nesting depth, frozen dataclasses and no `print()`. Tests are marked `unit`, `integration` or `e2e` (`uv run pytest -m e2e`). Working conventions (test first, reviews, commit style) are in `CLAUDE.md`; the rules audit is in `docs/ENGINEERING_AUDIT.md`.

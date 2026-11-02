@@ -1,98 +1,71 @@
 # Exposure Case Builder: Build Plan
 
-Living plan for the SWARM Global build (Nov 2-6, 2026). Update the **Status** section as work lands. A new session should read this file and `CLAUDE.md` first.
+Living plan for the SWARM Global build (Nov 2-6, 2026). A new session should read this file and `CLAUDE.md` first. Design is in `docs/architecture.md`; the rules audit is in `docs/ENGINEERING_AUDIT.md`; prior art is in `docs/PRIOR_ART.md`.
 
-**Pivot (2026-11-02):** the project began as an insider-threat case builder on CERT data. The competition Tenable tenant has no user-activity telemetry (only users, assets, scans, vulnerability findings), so the build now targets vulnerability exposure. The architecture carries over; the insider code is in git history (`56f8788` and earlier).
+**Pivot (2026-11-02):** the project began as an insider-threat case builder on CERT data. The competition Tenable tenant has no user-activity telemetry (only users, assets, scans, vulnerability findings), so the build targets vulnerability exposure. The insider code is in git history (`56f8788` and earlier).
 
 ## What we're building
 
-One **case per finding cluster**: a vulnerability (Tenable plugin) affecting many assets. A triage queue ranks clusters so a human sees the most important work first. Each case holds the affected assets, a timeline, a score breakdown and the source records, and exports as Markdown, CSV and JSON for engineers on other teams. Claude writes the narrative; the human records the disposition.
-
-Three components with a fixed division of labor:
-
-1. **Deterministic Python engine** (stdlib only). Ingests a saved Tenable export, clusters, scores, assembles cases and exports. No ML.
-2. **Stdio MCP server** wrapping the engine.
-3. **Claude Code skill** (`/exposure-case`) plus a short playbook that chains the tools.
+An MCP server and Claude Code skill that turn a Tenable Vulnerability Management export into two linked views of the same findings: **cases** for the security team (what is risky, ranked, with evidence) and **fix packages** for the people who fix things (what to do, what it clears, on which hosts). Claude writes the cited narrative; the human analyst records the decision. A deterministic stdlib engine does all clustering, scoring and evidence collection. No ML.
 
 ## Decisions made
 
 | Decision | Choice | Why |
 |---|---|---|
-| Domain | Vulnerability exposure, not insider threat | Tenant data fits; no equivalent on the Exchange; user judged insider threat added needless complication |
-| Case unit (risk layer) | **Hybrid (decided 2026-11-02):** patch-type families (`* Local Security Checks`, `Windows : Microsoft Bulletins`) are ONE case per family; every other plugin, CISCO included (user decision), is one case per `plugin.id` | Plain per-plugin clustering gave 7,148 cases whose top 20 were near-duplicate Windows KB plugins. Hybrid gives 815 cases (15 families + 800 plugins) |
-| Fix packages (engineer layer) | **Decided 2026-11-02:** a second, downstream view organized around the fix: key = normalized product (CPE) + fix type, falling back to the plugin. Each finding is in exactly one case and exactly one fix package; each links to the other | The security team needs risk-centred cases; the people who fix things need "what do I do and what does it clear". Cisco advisories roll up by product here (IOS, NX-OS) |
-| Known gap | Near-duplicate plugin cases remain (e.g. Oracle Java April/July/January CPU on the same 2 hosts; two Flash advisories on one host) | A product-level rollup is a possible later step; not in v0.1 |
-| Score | Transparent weighted sum, breakdown shown, weights in one table. User approved the weights 2026-11-02; KEV/VPR to be folded into the exploit component without changing weights | Explainable, no ML |
-| Context fields | VPR, EPSS, CISA KEV, `solution`, `see_also`, CVEs, CPE come from the export itself | 93-99% coverage; no extra fetch needed |
-| Team grouping | Affected assets grouped by OS, device type, /24 subnet | Tenant has no tags and only 2 groups |
-| Export | Markdown handoff + CSV of affected assets + JSON bundle; text by default, file write needs `confirm=true` to a fixed directory | Shareable with other teams |
-| Disposition | `record_disposition` per cluster: `assigned`, `risk-accepted`, `false-positive`, `needs-info`, plus a note | Append-only local JSONL, `confirm=true` |
-| Data | Competition tenant (fake, masked); trimmed sample committed, full export gitignored | User confirmed it is all fake data |
-| Fetch | Optional documented script `scripts/fetch_tenable.py`; engine reads saved files | Offline deterministic core |
-| Secrets | DPAPI-encrypted file `~/.secrets/tenable.cred.xml`, loaded to env vars per session | No new dependency, nothing in the repo |
-| Repo | Reuse this repo; package renamed `exposure_case` | User chose reuse |
-| MCP SDK | `mcp==2.3.0` | Smoke-tested in Claude Code 2026-11-02; `from mcp.server.mcpserver import MCPServer` |
-| Python | >=3.10 via `uv` | `mcp` requires >=3.10 |
+| Domain | Vulnerability exposure, not insider threat | The tenant data fits; the user judged insider threat added needless complication. Prior art in this domain exists (see `PRIOR_ART.md`); we are differentiated, not novel |
+| Case unit (risk layer) | Patch-type families (`* Local Security Checks`, `Windows : Microsoft Bulletins`) are one case per family; every other plugin, CISCO included (user decision), is one case per `plugin.id` | Plain per-plugin clustering gave 7,148 cases whose top 20 were near-duplicate KB plugins. Hybrid gives 815 (15 + 800) |
+| Fix packages (engineer layer) | Key = normalized product (CPE vendor:product) + fix type (from the solution's opening verb), falling back to the plugin. Every active finding is in exactly one case and one package; each links to the other | Security wants risk-centred cases; fixers want "what do I do and what does it clear" |
+| Score | One transparent weighted sum with a component breakdown; weights approved by the user 2026-11-02; KEV and VPR feed the exploit component without changing weights | Explainable, no ML |
+| Two-list queue | `case_queue` returns single-vulnerability *threats* and patch *backlogs* separately | KEV is common here, so large backlogs saturate the exploit component and would bury threats such as BlueKeep |
+| Impact wording | A package's totals are what it *contains* across several distinct actions; only each action's own row says what it alone clears | Tenable's data does not say one update supersedes another |
+| Disposition | `assigned`, `risk-accepted`, `false-positive`, `needs-info`; append-only local JSONL, latest per item wins, `confirm=true`; bulk views omit the free-text note | Human decides; a stored note is replayed to a model |
+| Fetch client | stdlib `urllib`, not pyTenable | pyTenable needs Python >= 3.11 and 14 runtime dependencies for a four-endpoint fetch; see `PRIOR_ART.md` |
+| Rules | The user's `common/` and `python/` rules are copied into `.claude/rules/` (gitignored: private instructions, licence unknown); the enforceable parts are committed tooling | See `CLAUDE.md` and `ENGINEERING_AUDIT.md` |
+| Data | Competition tenant (fake, masked); trimmed sample committed (no plugin output); full export gitignored | The user confirmed it is all fake data |
+| Secrets | DPAPI-encrypted `~/.secrets/tenable.cred.xml`, loaded to env vars per session; `TENABLE_UA_VENDOR=SpookyFox9` is set there | Nothing in the repo |
+| Output locations | Absolute; default `~/.exposure-case/` | Never relative to the working directory |
+| MCP SDK / Python | `mcp==2.3.0`; Python >= 3.10, tested on 3.10 and 3.14 | `from mcp.server.mcpserver import MCPServer` |
+| Submission | One MCP-server listing (`docs/exchange/mcp-server-listing.md`) | The rules allow one submission per team and one file per PR |
 
-## Tenable data facts (surveyed 2026-11-02, Tenable Vulnerability Management, cloud.tenable.com)
+## Tenable data facts (surveyed 2026-11-02, cloud.tenable.com)
 
-- `/users`: 75; `/groups`: 2; `/assets`: 178 (164 with vulns); `/scans`: 4 (Partner Lab, Weekly Network, BeyondTrust Advanced Agent, Daily Agent); tag values: 0.
-- `/audit-log/v1/events`: HTTP 403 with the current read-only keys.
-- `/workbenches/vulnerabilities`: 5000 plugin-level rows (possibly a cap, unverified) with `count`, `severity`, `vpr_score`, `cvss_base_score`, `cvss3_base_score`, `plugin_family`, `plugin_id`, `plugin_name`, `vulnerability_state`.
-- `POST /vulns/export` (states open/reopened/fixed): `num_assets` is the **assets per chunk**, not a limit. The default fleet export returns 4 chunks. Full export (fetched 2026-11-02, 30 s, about 108 MB on disk): **19,437 findings, 160 assets, 7,714 plugins (7,148 clusters with non-info, non-fixed findings), 18 scans**. States: 18,448 OPEN, 604 REOPENED, 385 FIXED. Severity: 9,071 info, 4,391 medium, 3,856 high, 1,354 critical, 765 low. 3,531 have `exploit_available`, 753 `exploited_by_malware`, 192 `in_the_news`, 50 `unsupported_by_vendor`, 0 `checks_for_default_account`. `first_found` spans 2026-05-18 to 2026-11-02. There are no duplicate (asset, plugin, port, protocol) rows.
-- Record keys: `finding_id`, `state`, `severity`, `first_found`, `last_found`, `asset{uuid,hostname,ipv4,operating_system,device_type,...}`, `plugin{id,name,family,synopsis,description,exploit_available,exploited_by_malware,in_the_news,has_patch,unsupported_by_vendor,checks_for_default_account,exploit_framework_*,xrefs,cpe,...}`, `port{port,protocol,service}`, `scan{uuid,started_at,schedule_uuid,target}`, `output`, `source`. **Correction (2026-11-02):** an earlier version of this plan said the export has no `vpr`, `cvss` or `solution`. That was wrong: Tenable omits empty fields per record, so one record's keys misled. Across all 19,437 records the plugin object also has `solution`, `see_also`, `cve`, `vpr` (object with `on_cisa_kev`, `exploit_code_maturity`, drivers), `epss_score`, `cvss*`, `ms_bulletin`, `usn`, `patch_publication_date`, `vendor_unpatched`, `has_workaround`; finding records have `last_fixed`, `resurfaced_date`, `time_taken_to_fix` (only 196 findings). Coverage over 7,173 non-info plugins: solution 99%, see_also 99%, cpe 99%, vpr 93%, epss 93%, cve 93%, cvss3 89%. 3,754 distinct solution texts; "Update the affected packages." alone is on 1,781 plugins, so solution text cannot be the grouping key by itself.
-- **The workbench plugin list is capped at exactly 5,000 rows**, so 3,000 of the 7,677 clusters with non-fixed findings have no workbench row. That cap affects only `plugins.json` (used for reconciliation). VPR, EPSS and CISA KEV come from the export itself at 93% coverage, so they can feed the score (see "Scoring").
-- **Reconciliation** (non-fixed findings per plugin vs workbench `count`): of 4,677 comparable plugins, 4,622 match distinct hosts and 14 more match finding instances (one finding per host and port), so 4,636 (99.1%) match. The other 41 all have the export below the workbench count. The workbench saw 164 assets with vulns, the export has 160; the cause is unverified. Reconciliation is a reported tolerance (`reconcile.py`), not a hard assertion.
-- OS strings are highly varied (120 distinct first OS strings), so peer grouping needs normalization to an OS family. Device types: general-purpose 15,961, embedded 1,250, switch 551, unknown 428, firewall 422.
-- IPs, hostnames and similar fields are masked. Never OSINT them.
-- **Unverified:** where remediation text (`solution`) lives (not in the export), whether the workbench plugin list can be paged past 5,000 rows, the cause of the reconciliation gap, what the 4 assets missing from the export are.
-
-## Constraints (from the brief)
-
-- MIT license; public repo on a personal GitHub account (not EMU).
-- No secrets anywhere in git history (automatic Exchange rejection even if rotated). The pre-commit gitleaks hook stays on.
-- Read-only by default; local writes only, behind `confirm=true`; every outbound path documented in the README.
-- Output is evidence and facts; no recommendation targets a person; remediation guidance only from plugin data and labelled.
-- Pin every dependency; justify each third-party one. `mcp` is the single runtime dependency.
-- Every cluster number carries source record IDs.
+- Full export (fetched in 30 s, about 108 MB): **19,437 findings, 160 hosts, 7,714 plugins, 18 scans** (7,148 plugins with active non-info findings). States: 18,448 OPEN, 604 REOPENED, 385 FIXED. 10,283 active non-info findings, 793 of them on CISA KEV. `num_assets` is the assets per chunk, not a limit.
+- The export's plugin object carries `solution` (99% of plugins), `see_also` (99%), `cpe` (99%), `vpr` with `on_cisa_kev` (93%), `epss_score` (93%), `cve` (93%), `cvss3` (89%). Tenable omits empty fields per record, so one record's keys can mislead (an early version of this plan wrongly said `solution` was absent). Finding records carry `last_fixed`, `resurfaced_date`, `time_taken_to_fix` for a small minority (unit: seconds).
+- 3,754 distinct solution texts; "Update the affected packages." is on 1,781 plugins, so solution text cannot be the grouping key alone.
+- The workbench plugin list is capped at 5,000 rows; it is used only for reconciliation. Of 4,677 comparable plugins, 4,636 (99.1%) match Tenable's count as distinct hosts or finding instances; 41 do not, all with the export lower (cause unverified; the workbench saw 164 assets, the export has 160).
+- No tags; two groups; 75 users; the audit log returns HTTP 403 for the key used. Hostnames and IPs are masked: never research them.
 
 ## Repo layout
 
 ```
 insider-case-builder/               (directory name is a leftover; package is exposure_case)
-├── LICENSE, README.md, CLAUDE.md, pyproject.toml, uv.lock
-├── .githooks/pre-commit            gitleaks on staged changes
+├── LICENSE (MIT), README.md, CLAUDE.md, pyproject.toml, uv.lock
+├── .githooks/pre-commit            gitleaks, then scripts/check_all.sh
+├── .github/workflows/ci.yml        scripts/check_all.sh on Python 3.10 and 3.12; actions pinned to commits
+├── .claude/rules/                  private copy of the user's rules (gitignored)
 ├── src/exposure_case/
-│   ├── schema.py                   frozen dataclasses (Evidence, Finding)
-│   ├── ingest.py                   export reader (FindingRecord, PluginInfo)
-│   ├── cluster.py                  hybrid case grouping (patch families + plugins)
-│   ├── scoring.py                  weighted components, breakdown, ranking
-│   ├── timeline.py                 per-case timeline from first/last found dates
-│   ├── reconcile.py                trust check against Tenable's plugin counts
-│   ├── fixes.py                    fix packages: product + fix type, impact, links to cases
-│   ├── case.py                     case assembly (Phase 4)
-│   ├── export.py                   Markdown / CSV / JSON handoff
-│   ├── disposition.py              append-only local JSONL log
-│   └── server.py                   MCP stdio server (thin wrapper)
-├── data/sample/                    committed sample: 1,125 findings, 154 assets, 50 plugins (data/raw/ is gitignored)
-├── scripts/fetch_tenable.py        the one outbound path
-├── scripts/make_sample.py          builds data/sample/ from a full export
-├── skills/exposure-case/SKILL.md
-├── playbooks/exposure-case-playbook.md
-├── tests/
-└── docs/                           PLAN.md
+│   ├── common.py, text_safety.py, schema.py        shared pieces and the Evidence type
+│   ├── ingest.py                                    saved export -> FindingRecord
+│   ├── cluster.py, fixes.py, links.py               cases, fix packages, the links between them
+│   ├── scoring.py, timeline.py, reconcile.py        ranking, dated events, trust check
+│   ├── case.py, report_md.py, export.py             case file / package view, Markdown, CSV+JSON+writers
+│   ├── disposition.py                               append-only decision log
+│   └── service.py, server.py                        Workspace (tool answers) and the stdio MCP server
+├── scripts/                        fetch_tenable.py (the one outbound path), make_sample.py, check_standards.py, check_all.sh
+├── data/sample/                    1,125 findings, 154 hosts, 50 plugins (fake, masked, no plugin output)
+├── skills/exposure-case/SKILL.md, playbooks/exposure-case-playbook.md
+├── tests/                          unit, integration and e2e (conftest assigns the markers)
+└── docs/                           PLAN.md, architecture.md, ENGINEERING_AUDIT.md, PRIOR_ART.md, exchange/
 ```
 
-**README sections (Exchange requires):** Purpose, Prerequisites, How to run, Outputs, Known limitations, Data flows, Data sources and licensing. Tag a release (v0.1.0) and submit from the tag.
+## Scoring (`scoring.py` is authoritative)
 
-## Scoring (implemented in `scoring.py`; weights are the single source of truth)
-
-Total = sum of component points (max 100). Every case returns the component breakdown. VPR/CVSS are not inputs (partial coverage).
+Total = sum of component points (max 100); every case and package returns the breakdown.
 
 | Component | Weight | Raw value (0..1) |
 |---|---|---|
 | severity | 30 | worst active severity: critical 1.0, high 0.75, medium 0.4, low 0.1 |
-| exploit | 25 | exploited by malware 1.0, else exploit available 0.6, else 0; +0.2 if in the news (cap 1) |
+| exploit | 25 | strongest signal on any finding: CISA KEV 1.0, exploited by malware 1.0, VPR >= 9 0.9, VPR 7-8.9 0.7, public exploit 0.6; +0.2 if in the news (cap 1) |
 | breadth | 15 | log1p(hosts) / log1p(fleet hosts) |
 | volume | 10 | log1p(distinct plugins) / log1p(1000) |
 | age | 5 | days since the oldest active `first_found` / 180 (cap 1) |
@@ -100,138 +73,84 @@ Total = sum of component points (max 100). Every case returns the component brea
 | recurrence | 5 | reopened findings / 5 (cap 1) |
 | patch | 5 | any finding with a vendor patch available |
 
-Ages are measured from the latest `last_found` in the data, never the wall clock, so ranking is deterministic. Ties break on cluster id.
+Ages are measured from the newest `last_found` in the data, never the wall clock; ties break on id. On the full export 549 of 7,148 plugins are on KEV and 504 more have VPR >= 9, so 14 of the top 30 cases are patch families; the two-list queue exists for that reason. Top cases: Windows Microsoft Bulletins 86.9, Ubuntu 81.8, Junos, Solaris, Oracle Linux, Red Hat; among threats Shellshock, old Flash, BlueKeep, SIGRed, libcurl, Sudo, Log4j.
 
-**Hand-check, full export (2026-11-02, after KEV/VPR; superseded detail below):** 815 cases rank in under a second. Top: Windows Microsoft Bulletins (14 hosts, 621 vulns, 86.9), Ubuntu (12 hosts, 81.8), Junos, Solaris, Oracle Linux, Red Hat; among plugin cases Shellshock (#13), then old Flash, BlueKeep, SIGRed, libcurl, Sudo, Log4j. Patch families take 14 of the top 30 because "any critical, any malware-exploited" saturates for hundreds of plugins; order among them rests on breadth, volume and age. **Weights approved by the user.**
+## MCP tools (`server.py` is authoritative; `tests/test_skill.py` and `tests/test_listing.py` enforce it)
 
-**After KEV/VPR:** 549 of 7,148 plugins (793 findings) are on the CISA KEV list and 504 more have VPR >= 9, so every large patch family saturates the exploit component. Top cases: Windows Bulletins 86.9, Ubuntu 81.8, Junos, Solaris, Oracle Linux, Red Hat ... (14 of the top 30 are patch families); KEV pulls Cisco IOS/NX-OS RCE advisories (#15-19), old Flash (#20, #22) and BlueKeep (#21) into the top 25. Top fix packages: Ubuntu (13 hosts, 111 critical, 37 KEV), .NET Framework, Windows, Debian, OpenSSH (21 hosts, 40 vulns), CentOS, Junos, Cisco IOS. Presentation decision: the case queue must show single-plugin threats and patch backlogs as two lists (`kind` filter), because backlogs otherwise bury threats such as BlueKeep.
+| Tool | Writes? | Purpose |
+|---|---|---|
+| `fleet_summary` | no | Totals, severity, case and package counts, KEV, data-quality notes |
+| `case_queue` | no | Ranked cases as `threats` and `backlogs` (or one kind); `hide_dispositioned` reports how many it hid |
+| `fix_queue` | no | Ranked fix packages |
+| `case_file` | no | One case: score breakdown, facts, linked packages, vulnerabilities, hosts, timeline, limitations, disposition |
+| `fix_package` | no | One package: Tenable's actions with what each clears, contained impact, hosts, CVEs, advisories, cases |
+| `findings` | no | Real finding records behind a case or package, paged, so a narrative cites genuine ids |
+| `export` | with `write=true` and `confirm=true` | Markdown / CSV inline (size-capped); all formats to the export directory |
+| `record_disposition` | yes, `confirm=true` | One appended line in the decision log |
 
-## MCP tools
-
-| Tool | Output |
-|---|---|
-| `fleet_summary` | Totals, severity distribution, state counts |
-| `clusters` | Ranked list: cluster ID, plugin, score, asset count, max severity, age, one-line reason; `top_n` |
-| `cluster_case` | Summary, score breakdown, affected-asset table, timeline, fleet share, sample plugin output, remediation info, evidence record IDs |
-| `export_case` | Analyst case file (Markdown, CSV, JSON); file writes need `confirm=true` |
-| `fix_packages` | Ranked fix packages: product, fix type, actions, hosts, impact, cases relieved |
-| `fix_package` | One package in full: actions with vulns cleared, host table, advisory links, CVEs |
-| `export_fix_package` | Engineer handoff (Markdown, CSV, JSON); file writes need `confirm=true` |
-| `record_disposition` | `cluster_id`, `analyst`, `disposition`, `note`, `confirm`; rejects unless `confirm=true` |
-
-The data path comes from `EXPOSURE_CASE_DATA` or a server argument; no tool accepts arbitrary file paths.
+No tool accepts a file path. `confirm` is a convention: the client's tool-permission prompt is the real gate.
 
 ## Testing strategy
 
-- Unit tests per component (pytest, written first) with hand-built fixtures; every cluster asserts non-empty evidence.
-- **Reconciliation test:** each cluster's asset count must match Tenable's plugin-level `count` for the same export. There is no answer key, so this is the trust check.
-- Golden-file tests for the exporters.
-- MCP contract tests: an SDK client spawns the stdio server, calls each tool, checks schemas and clean failure on bad input.
-- Demo check: a narrative may cite only record IDs that exist in the data.
-- Security gate: gitleaks on every commit; a full-history scan before the Exchange PR.
+Unit tests per module (test first, RED observed), the MCP contract tests (real server, real SDK client), an end-to-end flow (fake Tenable -> fetch script -> server -> export -> decision), golden-file tests for the exporters, drift guards (skill, listing, workflow gates), and the standards checker run over this repo. Coverage gate 80% (actual 96% branch). A hash of every export and tool answer on the full real tenant (1,015 items) and on the sample (93) is used to prove behavior-neutral refactors.
 
-## Build order
+## Build status
 
-**Phase 1: reset (Mon Nov 2 evening)**
-1. [x] Rename package to `exposure_case`, remove insider code/data, generalize `Finding`
-2. [x] Rewrite `CLAUDE.md`, `README.md`, this plan
-3. [x] Save pivot to project memory
-4. [ ] User runs `claude mcp remove insider-smoke` (leftover registration)
+| Phase | What | Status |
+|---|---|---|
+| 1-2 | Reset to the new domain; ingest; fetch script; sample | done (`a186308` and earlier) |
+| 3, 3b | Clustering, scoring, timeline, reconciliation; fix packages, links, KEV/VPR, real fix dates | done |
+| 4 | Case files and Markdown/CSV/JSON exports, security-reviewed | done |
+| 5 | Disposition log, service, 8-tool MCP server, skill, playbook | done, reviewed twice |
+| 6 (local) | History scan, README, fresh-clone install check, Exchange listing draft | done |
+| Audit | Rules audit, whole-repo security and code review, prior-art research, standards checker, hook, CI | done 2026-11-02 (`docs/ENGINEERING_AUDIT.md`) |
+| Submit | Live Claude Code session; public repo; tag v0.1.0; Exchange PR | **open, needs the user** |
 
-**Phase 2: ingest (test-first)**
-1. [x] `scripts/fetch_tenable.py` (export job, polling, chunks to `data/raw/`; keys from env only); 9 tests with a fake transport
-2. [x] `ingest.py` export reader and plugin-info loader; 20 tests. Full-fleet export fetched and loads in 0.6 s (19,437 records)
-3. [x] `scripts/make_sample.py` and committed `data/sample/` (top 40 plugins by asset count plus 10 notable; biased to common plugins, so only 33 critical findings)
-4. [x] python-reviewer pass on Phase 2 code. Fixed: server-supplied chunk IDs (path traversal), non-dict responses, malformed-record crashes in `make_sample.py` (now reuses the engine parser), invalid UTF-8 / deep-nesting / oversized files, 3.10-safe timestamps with any fraction length, `chunks_failed` detection, cleanup after a partial fetch, API keys hidden from client repr/`vars()`, key validation. Not done on purpose: 429 retry/backoff (single export job), treating duplicate `finding_id` as updates (real export has none), numeric-string ports. 87 tests pass.
+## Submission checklist (needs the user)
 
-**Phase 3: engine (test-first)**
-1. [x] Hybrid clustering (`cluster.py`, 19 tests)
-2. [x] Score components, ranking, documented weights (`scoring.py`, 22 tests); hand-checked on the full export
-3. [x] Per-case timeline (`timeline.py`) and reconciliation report (`reconcile.py`), 9 tests
-4. [x] User sign-off on the weights (2026-11-02); CISCO split from patch families
+1. Confirm eligibility: the rules require registering at info.tenable.com/2026-SWARM-GLOBAL.html before it closed (Nov 1), joining the Discord, and every contributing member accepting the CyberAgents Contribution Agreement. Read the agreement (not fetched here): it covers licence, authority including "any required employer permission", and non-infringement.
+2. Ask on Discord for the **Submission Deadline** (the rules use the term but never define it) and how to **notify Tenable** of the submission.
+3. Run one live Claude Code session on `data/sample` (`claude mcp add`; see the playbook). Keep `export` and `record_disposition` on "ask".
+4. Create the public repository on the personal account and push. The listing assumes `github.com/SpookyFox9/exposure-case-builder`.
+5. Tag `v0.1.0`.
+6. Fork `tenable/cyberagents-exchange`; copy `docs/exchange/mcp-server-listing.md` to `mcp-servers/exposure-case-builder.md`; set `contribution_agreement_date` to your own acceptance time, the final `github_url` and `date_added`; run the Exchange's own `uv run ./validator.py`; open the PR titled `Add listing: Exposure Case Builder` with the acceptance statement in the description.
+7. Pitch (Thu Nov 5, selected teams, about 15 minutes) and awards (Fri Nov 6): build the demo around one live case walk-through on the sample.
 
-**Phase 3b: fix view (decided 2026-11-02)**
-1. [x] Split CISCO from patch families; correct the PLAN facts about `solution`/VPR
-2. [x] Ingest carries solution, see_also, CVEs, CPE, VPR (score, severity, KEV, exploit maturity), EPSS, CVSS3, patch date, fix dates; malformed optional fields degrade to defaults (`test_ingest_fix_fields.py`)
-3. [x] `fixes.py`: 200 fix packages on the full export (125 patch, 75 configuration; 58 plugin-level fallbacks), built in 0.9 s; every one of the 10,283 active non-info findings is in exactly one package
-4. [x] `links.py`: case-to-fix and fix-to-case links with shares; raises if the two views do not describe the same findings. `rank_packages` scores packages with the same approved weights
-5. [x] CISA KEV and VPR folded into the exploit component, weights unchanged: KEV 1.0, malware 1.0, VPR >= 9 0.9, VPR 7-8.9 0.7, public exploit 0.6, +0.2 in the news (cap 1)
-6. [x] Real `last_fixed` / `resurfaced_date` in the timeline (kinds `fixed`, `reopened`; `last_seen_*` only as fallback). On the full export every fixed or reopened non-info finding has them
+## Verified facts about the competition (2026-11-02)
 
-Review of the fix view (python-reviewer, 2026-11-02) fixed: overflow on huge JSON integers in optional numeric fields, size caps on untrusted text and lists (4,096 chars, 100 items), package ids that could collide after slugging (now a short hash only on collision), exploit-reason ties resolved by text, a finding appearing in two cases now rejected, host details taken from the latest finding, classifier gaps ("Patch ...", "Updates ...", "Apply the workaround and disable ...", "Microsoft recommends ..."), CPE escapes and NA/wildcard values. **Impact wording:** a package's `impact` is what it CONTAINS across `actions` distinct fix actions; each action carries its own `critical_findings` and `critical_share`. Example: the Windows patch package spans 59 actions and contains 1.3% of the fleet's critical findings, but its biggest single action clears 0.22%. Not acted on: first-CPE ordering (no evidence of a problem in this data) and an EPSS upper bound (values above 1 occur). 259 tests.
-
-Fix-type rule (documented in `fixes.py`): the solution's opening verb decides. update/upgrade/apply/install/"Microsoft has released" = `patch`; "Contact the vendor ... for an update/patch" = `patch` unless it also says disable/configure/remove etc.; everything else = `configuration`; empty = `unspecified`. `has_patch` is NOT used (true for 98% of plugins) and `has_workaround` is always false in this tenant.
-
-**Phase 4: case and export**
-1. [x] `case.py`: `CaseFile` (analyst) and `PackageView` (engineer), deterministic, JSON-ready
-2. [x] `export.py`: Markdown, CSV, JSON for both views; `write_*_export` needs `confirm=true`, never leaves the output directory; golden-file tests
-3. [x] Untrusted-text handling: CSV formula neutralization, Markdown/HTML escaping (backslash escapes so raw text stays readable), size caps with pointers to the complete JSON/CSV
-4. [x] Security review of the exporters (python-reviewer, 2026-11-02) fixed: backslash-defeats-escape bypass (backslashes are now escaped first), link and image injection (`[ ]` escaped, advisory URLs rendered as code spans), bidi/zero-width/line-separator characters stripped, CSV leading-whitespace formula bypass, UTF-8 BOM on CSV, hash-suffixed bounded file names (collision, Windows reserved names, long names), atomic writes via temp file and `os.replace` (replaces a symlink rather than following it), floored percentages (never 100% unless exact), clearer headers ("address", "alone clears"), timeline cap keeps the most recent events, singular "1 day", tz-aware `as_of` required, unknown severities rejected at ingest. Not acted on: Slack/Jira escaping (Markdown is the documented target; JSON is the exact copy). 345 tests (1 skipped where Windows cannot create symlinks).
-5. [x] Real-data check: all 200 packages and 815 cases render in 0.5 s; largest Markdown 12 KB, largest JSON 876 KB; no formula-capable CSV cells and no raw angle brackets
-
-**Phase 5: MCP, skill, playbook**
-1. [x] `disposition.py`: append-only JSONL, fixed vocabulary, `confirm=true`, validated and bounded fields, latest-wins read (30 tests)
-2. [x] `service.py`: `Workspace` answers every tool question as capped JSON; ids validated against the loaded data; no tool takes a path (35 tests on the committed sample)
-3. [x] `server.py`: 8 tools over stdio (`fleet_summary`, `case_queue`, `fix_queue`, `case_file`, `fix_package`, `findings`, `export`, `record_disposition`); queue returns threats and backlogs as two lists; anticipated errors surface their message via `ToolError`, bugs stay opaque; 17 contract tests drive the real server with the SDK client (annotations, confirm gates, error messages, startup failures)
-4. [x] `skills/exposure-case/SKILL.md` and `playbooks/exposure-case-playbook.md`; `tests/test_skill.py` fails if a tool is undocumented or the skill names one that does not exist
-5. [ ] Register the server with Claude Code and run one live session (user runs `claude mcp add`; see the playbook)
-6. [x] Review pass (python-reviewer) on `service.py`, `server.py`, `disposition.py`, 2026-11-02. Fixed: `confirm`/`write` are strict booleans (the SDK refuses "true", 1, "yes"); the docs and error text no longer claim the server verifies human approval (it cannot; Claude Code's tool-permission prompt is the real gate, so keep both write tools on "ask"); server instructions and the skill say Tenable text and recorded notes are data, never instructions; a corrupt or hostile disposition-log line is skipped and counted (`log_warnings`) instead of breaking every queue call; log entries are type-checked, reads are cached by mtime/size, and the log is capped at 5 MB; case files and packages are built once per id; inline exports are capped at 60,000 characters with a pointer to `write=true`; vulnerability solution text is shortened to 500 characters in tool output and `max_vulns` is capped at 100; exports report file names only (no absolute paths); `kind`, `format` and `disposition` are enums in the tool schema. Not acted on: retracting a disposition (append a new entry instead), an OS-level file lock for two server instances (single small appends), and MCP elicitation (client support unverified).
-7. [x] Tenable User-Agent: every API call sends `Integration/1.0 (VENDOR; PRODUCT; Build/VERSION)` per https://developer.tenable.com/docs/user-agent-header (read 2026-11-02; Tenable "recommends" it and lists it as a validation criterion in the VM integration guide). The page does not mention contact details in the string; vendor defaults to the project name and `TENABLE_UA_VENDOR` overrides it. 8 tests. The survey scripts used earlier in this session (scratchpad, outside the repo) sent Python's default agent.
-
-**Phase 6: polish and submit**
-1. [x] Full-history secret scan: 12 commits, gitleaks clean; commits use the GitHub noreply address; no personal email in history. The Windows username appears in a path in two early commits (not rewritten; removed from the current tree)
-2. [x] README finished: every Exchange-required section, a data-flow section naming every outbound call, honest limitations, security notes, dependency licenses. Install verified from a fresh clone: `uv sync`, 472 tests, server answers on the sample
-3. [x] Exchange listing drafted at `docs/exchange/mcp-server-listing.md` (MCP server, validated by `tests/test_listing.py` against the vocabularies read on 2026-11-02 and against the real server's tool list)
-4. [ ] One live Claude Code session on the sample (user runs `claude mcp add`; see the playbook)
-5. [ ] Create the public GitHub repo on the personal account and push (user)
-6. [ ] Tag v0.1.0 after the live session and push the tag
-7. [ ] Fork tenable/cyberagents-exchange, copy the listing to `mcp-servers/exposure-case-builder.md`, set `contribution_agreement_date` to the moment you accept the CyberAgents Contribution Agreement, set the final `github_url` and `date_added`, run the Exchange's own `uv run ./validator.py`, open the PR titled `Add listing: Exposure Case Builder` with the acceptance statement in the description
-8. [ ] Decide on a second listing for the skill (the checklist as reported wants `SKILL.md` at the repo root; ours is in `skills/exposure-case/`) and rehearse the demo; confirm submission details at office hours
+- Rules (exchange.tenable.com/swarm-global-rules-nov2026): teams of 1-3; one submission per team, to the CyberAgents Exchange, per its contribution guidelines; judges are a panel of Tenable (possibly Anthropic) staff choosing 1st-3rd place with **no published criteria or weights**; no demo, video or deck requirement is stated; pre-existing code and data restrictions are not addressed (this repo's first commit was 12:51 ET Nov 2, after the 11:00 ET kickoff); BYOT; MIT preferred. Prizes: $10,000 of Anthropic platform credits ($5,000 / $3,000 / $2,000), EXPOSURE 2027 passes, patches, featured Exchange placement. Contest period Nov 2 11:00 ET to the awards stream Nov 6.
+- Exchange mechanics (README, CONTRIBUTING.md, `docs/contributing_checklist.md`, `validator.py`, templates): one new markdown file per PR; branch `add-<slug>`; `tier` must be `contributed`; `github_url` and `author` must match the real repo; an MCP-server listing is checked for runtime-versus-manifest, transport and tools-versus-code congruence; secrets are scanned over the full history; the README needs purpose, prerequisites, how to run, outputs and limitations.
 
 ## Risks
 
-- **High:** the score reads as arbitrary. Mitigation: breakdown, one weights table.
-- **Resolved:** full export size and time (30 s, 108 MB, loads in 0.6 s).
-- **High:** 7,148 clusters, so ranking quality is the product. Mitigation: documented components, hand-checked top 20 against the data.
-- **Medium:** Tenable already ranks by VPR. Lead the demo with clustering, evidence, handoff export and disposition.
-- **Medium:** remediation text may need another endpoint (another outbound call).
-- **Medium:** time; the target is a working demo by the end of Tuesday.
-- **Low:** masked identifiers; treated as opaque.
+- **High:** the Exchange contribution agreement and employer permission are the user's to read and attest; nothing here substitutes for that.
+- **Medium:** judging criteria are unpublished; the live Claude Code session has not been run, so narrative quality is untested beyond the contract tests.
+- **Medium:** overlap with existing listings (Patch Shepherd, the vetted Remediation Priority & Impact Agent, the Chokepoint family); positioning must stay honest.
+- **Low:** the ranking weights are a judgment, not validated against outcomes.
 
-## Unverified items (do not assume)
+## Unverified (do not assume)
 
-- Official Rules were not read. Open: whether pre-existing code is allowed or work must start during the event; repo-structure, demo-video and pitch-deck requirements; data restrictions; whether all submissions or only winners must be listed on the Exchange. This repo was started before the event (Nov 2 evening); the pivot to Tenable data happened during it.
-- Submission deadline and pitch-selection process; assumed Wednesday Nov 4, confirm at office hours.
-- Exchange mechanics, **verified 2026-11-02 from tenable/cyberagents-exchange (README, CONTRIBUTING.md, validator.py, templates, docs/contributing_checklist.md)**: one new markdown file per PR (so one PR per listing); branch `add-<slug>`; PR title `Add listing: <Name>`; PR description must state acceptance of the CyberAgents Contribution Agreement; `tier` must be `contributed`; `domains` and `contribution_agreement_date` are required in practice; `github_url` and `author` must match the real remote; no release-tag field. Not read: the Contribution Agreement itself, SECURITY.md, the submission-builder skill. The skill that automates this (`/cyberagents-exchange-submit`) is not installed in this environment.
-- Tenable's User-Agent guide says "recommends"; the VM integration guide lists it as a validation criterion.
-- Judging criteria and weights are unpublished. The user's priority is impact on real security work.
-- Tenable items listed under "Tenable data facts".
+- The Contribution Agreement text, SECURITY.md, and the submission-builder skill's checks (only a model summary of its SKILL.md was available).
+- Whether the Submission Deadline is Wed Nov 4 (assumed) or later.
+- The minimum Tenable role needed for vulnerability exports (the key used could not read the audit log).
+- The cause of the 41 count mismatches against Tenable's own numbers.
+- Whether MCP elicitation is supported by the client (not used; `confirm` plus the client prompt is the gate).
+- The Chokepoint Finder repositories (only their listing files were read).
 
-## Status (update as work lands)
+## Status
 
-Last updated: 2026-11-02, Monday evening.
-
-- Done: pivot decided and confirmed (finding-cluster cases, reuse repo, tenant data is fake and usable, live fetch allowed as a documented path).
-- Done: Tenable keys stored in `~/.secrets/tenable.cred.xml` (DPAPI); `tenable-env.ps1` loads them per session. Survey scripts live in the session scratchpad, not the repo.
-- Done (Phase 1): package renamed to `exposure_case`; insider generator, data and tests removed; `Finding` now uses `subject`; 8 tests pass; docs rewritten. Nothing is committed yet.
-- Done (Phase 2): `ingest.py`, `scripts/fetch_tenable.py`, `scripts/make_sample.py`, `data/sample/` (1.3 MB, gitleaks clean). 139 tests pass. The full export lives in `data/raw/full1` (gitignored, about 108 MB). Committed as `094e311`.
-- Done (Phase 3b): ingest fix fields, `fixes.py`, `links.py`, KEV/VPR in scoring, real fix dates in the timeline; 259 tests, ruff and mypy clean.
-- Done (Phase 3): `cluster.py`, `scoring.py`, `timeline.py`, `reconcile.py`; 139 tests pass; ruff and mypy clean. 815 cases from the full export (15 patch families, 800 plugins). Weights approved.
-- Done (Phase 4): case file and package view with Markdown/CSV/JSON exports, security-reviewed; 345 tests, ruff and mypy clean.
-- Done (Phase 5, pending review): disposition log, service layer, 8-tool MCP server with contract tests, skill and playbook; 472 tests, reviewed.
-- Done (Phase 6, local part): history scan, README, fresh-clone install check, drafted Exchange listing. 481 tests.
-- Next, all needing the user: the live Claude Code session, creating the public GitHub repo, tagging v0.1.0, and the Exchange PR (it carries the user's own acceptance of the Contribution Agreement).
+Last updated: 2026-11-02, afternoon. 543 tests pass at 96% branch coverage on Python 3.10 and 3.14; ruff, black, mypy, bandit and the standards checker are clean; full-history secret scan clean. Everything buildable without the user is built; the open items are the submission checklist above.
 
 ## Resuming in a new session
 
 ```bash
 cd <path to this repo>
-uv sync                      # create .venv with pinned deps (Python >=3.10)
-uv run pytest                # run tests
+uv sync                      # pinned runtime and dev dependencies
+git config core.hooksPath .githooks
+sh scripts/check_all.sh      # every gate, including the tests
 ```
 
-- Read `CLAUDE.md`, then this file's Status and Build order. Continue at the first unchecked item.
-- To use the Tenable API in PowerShell: `. $HOME\.secrets\tenable-env.ps1` (loads env vars for that session). To re-store keys, run `powershell -File $HOME\.secrets\tenable-store.ps1` in a real terminal, not through `!`.
-- gitleaks is installed via winget (`Gitleaks.Gitleaks`). The hook runs `gitleaks git --staged`. `gitleaks dir .` reports false positives inside the gitignored `.venv`; scan the staged diff or history instead.
-- The research doc lives outside the repo, in the parent folder. Keep it out. Read only section 3 (Exchange contribution process).
-- Workflow reminders: write tests first; run the code-review and security-review agents on new code; commit only when asked.
+- Read `CLAUDE.md`, then this file's Submission checklist.
+- API keys: `. $HOME\.secrets\tenable-env.ps1` (PowerShell) loads them per session along with `TENABLE_UA_VENDOR`; re-store with `powershell -File $HOME\.secrets\tenable-store.ps1` in a real terminal (not through `!`).
+- The full export used for measurements lives in `data/raw/full1` (gitignored). Re-fetch with `scripts/fetch_tenable.py`.
+- The research doc is outside the repo, in the parent folder. Keep it out.

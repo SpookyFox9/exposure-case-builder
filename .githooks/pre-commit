@@ -1,7 +1,14 @@
 #!/bin/sh
-# Secret scan on staged changes. Commit is blocked if gitleaks is missing or finds anything.
+# Pre-commit: scan the staged diff for secrets, then run every quality gate.
+# The commit is blocked if a tool is missing or any check fails. Do not bypass it (no --no-verify).
 if ! command -v gitleaks >/dev/null 2>&1; then
   echo "pre-commit: gitleaks not found; install it (winget install Gitleaks.Gitleaks). Commit blocked." >&2
   exit 1
 fi
-exec gitleaks git --staged --redact --no-banner -v
+gitleaks git --staged --redact --no-banner -v || exit 1
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "pre-commit: uv not found; install it (https://docs.astral.sh/uv/). Commit blocked." >&2
+  exit 1
+fi
+exec sh scripts/check_all.sh

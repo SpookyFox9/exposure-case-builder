@@ -19,3 +19,9 @@ __pycache__/
 *.key
 # Editor / vault
 .obsidian/
+
+# Local-only Claude Code files (private rule copies live here)
+.claude/rules/
+.claude/settings.local.json
+# Coverage output
+htmlcov/
