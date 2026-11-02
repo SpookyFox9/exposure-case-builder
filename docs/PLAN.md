@@ -170,8 +170,12 @@ Fix-type rule (documented in `fixes.py`): the solution's opening verb decides. u
 5. [x] Real-data check: all 200 packages and 815 cases render in 0.5 s; largest Markdown 12 KB, largest JSON 876 KB; no formula-capable CSV cells and no raw angle brackets
 
 **Phase 5: MCP, skill, playbook**
-1. [ ] MCP server with five tools and contract tests
-2. [ ] `SKILL.md` and playbook; demo on the sample data
+1. [x] `disposition.py`: append-only JSONL, fixed vocabulary, `confirm=true`, validated and bounded fields, latest-wins read (30 tests)
+2. [x] `service.py`: `Workspace` answers every tool question as capped JSON; ids validated against the loaded data; no tool takes a path (35 tests on the committed sample)
+3. [x] `server.py`: 8 tools over stdio (`fleet_summary`, `case_queue`, `fix_queue`, `case_file`, `fix_package`, `findings`, `export`, `record_disposition`); queue returns threats and backlogs as two lists; anticipated errors surface their message via `ToolError`, bugs stay opaque; 17 contract tests drive the real server with the SDK client (annotations, confirm gates, error messages, startup failures)
+4. [x] `skills/exposure-case/SKILL.md` and `playbooks/exposure-case-playbook.md`; `tests/test_skill.py` fails if a tool is undocumented or the skill names one that does not exist
+5. [ ] Register the server with Claude Code and run one live session (user runs `claude mcp add`; see the playbook)
+6. [ ] Review pass (python-reviewer) on `service.py`, `server.py`, `disposition.py`
 
 **Phase 6: polish and submit**
 1. [ ] Full-history secret scan, tag v0.1.0, Exchange PR (use `/cyberagents-exchange-submit`)
@@ -206,7 +210,8 @@ Last updated: 2026-11-02, Monday evening.
 - Done (Phase 3b): ingest fix fields, `fixes.py`, `links.py`, KEV/VPR in scoring, real fix dates in the timeline; 259 tests, ruff and mypy clean.
 - Done (Phase 3): `cluster.py`, `scoring.py`, `timeline.py`, `reconcile.py`; 139 tests pass; ruff and mypy clean. 815 cases from the full export (15 patch families, 800 plugins). Weights approved.
 - Done (Phase 4): case file and package view with Markdown/CSV/JSON exports, security-reviewed; 345 tests, ruff and mypy clean.
-- Next: Phase 5 (MCP server with a `kind` filter on the queue, skill, playbook).
+- Done (Phase 5, pending review): disposition log, service layer, 8-tool MCP server with contract tests, skill and playbook; 440 tests.
+- Next: register the server in Claude Code and run one live session (user runs `claude mcp add`), a review pass on `service.py`/`server.py`/`disposition.py`, then Phase 6 (full-history secret scan, README finish, tag v0.1.0, Exchange PR).
 
 ## Resuming in a new session
 

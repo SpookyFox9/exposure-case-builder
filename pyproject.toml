@@ -9,6 +9,9 @@ requires-python = ">=3.10"
 # (needed to speak the Model Context Protocol over stdio).
 dependencies = ["mcp==2.3.0"]
 
+[project.scripts]
+exposure-case-server = "exposure_case.server:main"
+
 [dependency-groups]
 dev = ["pytest==9.2.0"]
 

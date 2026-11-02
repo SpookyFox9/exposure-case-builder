@@ -158,7 +158,7 @@ def build_case_file(ranked: RankedCluster, links: Links, as_of: datetime) -> Cas
     )
 
 
-def _reasons(score: Score, top: int = 3) -> tuple[str, ...]:
+def priority_reasons(score: Score, top: int = 3) -> tuple[str, ...]:
     best = sorted((c for c in score.components if c.points > 0), key=lambda c: (-c.points, c.name))[:top]
     return tuple(f"{c.detail} ({c.points:.0f} of {c.weight} points for {c.name})" for c in best)
 
@@ -186,5 +186,5 @@ class PackageView:
 def build_package_view(ranked: RankedPackage, links: Links, as_of: datetime) -> PackageView:
     return PackageView(
         rank=ranked.rank, score=ranked.score, package=ranked.package,
-        cases=links.cases_for(ranked.package.package_id), priority_reasons=_reasons(ranked.score), as_of=as_of,
+        cases=links.cases_for(ranked.package.package_id), priority_reasons=priority_reasons(ranked.score), as_of=as_of,
     )

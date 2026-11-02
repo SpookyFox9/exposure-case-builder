@@ -21,7 +21,27 @@ uv sync
 uv run pytest
 ```
 
-_TODO:_ fetch script, sample-data quickstart, MCP configuration for Claude Code.
+Try it on the committed sample (fake, masked tenant data), no Tenable account needed:
+
+```bash
+export EXPOSURE_CASE_DATA="$PWD/data/sample"
+uv run python -m exposure_case.server      # stdio MCP server; normally started by Claude Code
+```
+
+With real data, fetch an export (the one outbound network call; keys come from the environment, never the repo)
+and register the server with Claude Code:
+
+```bash
+uv run python scripts/fetch_tenable.py --out data/raw/<name>
+claude mcp add exposure-case --env EXPOSURE_CASE_DATA=<absolute path to data/raw/<name>> -- uv run --directory <absolute path to this repo> python -m exposure_case.server
+```
+
+Then copy `skills/exposure-case` into your Claude skills folder. `playbooks/exposure-case-playbook.md` walks through
+setup, a triage session, how to read the numbers, and troubleshooting.
+
+**MCP tools.** Read-only: `fleet_summary`, `case_queue` (threats and backlogs as two lists), `fix_queue`, `case_file`,
+`fix_package`, `findings` (real finding ids to cite). Local writes, each needing `confirm=true`: `export` with
+`write=true`, and `record_disposition`. No tool accepts a file path.
 
 ## Outputs
 
@@ -30,7 +50,7 @@ Two views of the same findings, linked both ways (every active finding is in exa
 - **Case file (security team).** Rank and score with a per-component breakdown, summary facts, the fix packages that clear it, top vulnerabilities with CVEs, affected hosts, a timeline, limitations, and an empty disposition slot. Exports: `<case>.md`, `<case>.json`, `<case>-hosts.csv`.
 - **Fix package (engineers).** What to do (Tenable's own solution text, one row per distinct action with what each clears), the impact contained in the package, affected hosts, CVEs and advisory links, and the cases it relieves. Exports: `<package>.md` for tickets (hosts and actions capped, with a pointer to the full lists), `<package>.json` (complete), `<package>-hosts.csv` and `<package>-actions.csv` (complete).
 
-Exports are deterministic (no wall-clock time) and written only on request with `confirm=true`, to a fixed directory. Tenable-supplied text is neutralized: spreadsheet formulas in CSV cells are prefixed with an apostrophe (CSV files carry a UTF-8 BOM so Excel reads non-ASCII), Markdown markup is escaped so no tag, link or image can form, advisory URLs are shown as text rather than links, and invisible or bidirectional-override characters are removed. **Markdown is the supported target.** Other markups (Slack, Jira) need their own escaping; use the JSON, which is the exact unescaped copy, as the source for those. Files are written atomically, with a short hash in each file name so two items never overwrite each other. The disposition log is added with the MCP server.
+Exports are deterministic (no wall-clock time) and written only on request with `confirm=true`, to a fixed directory. Tenable-supplied text is neutralized: spreadsheet formulas in CSV cells are prefixed with an apostrophe (CSV files carry a UTF-8 BOM so Excel reads non-ASCII), Markdown markup is escaped so no tag, link or image can form, advisory URLs are shown as text rather than links, and invisible or bidirectional-override characters are removed. **Markdown is the supported target.** Other markups (Slack, Jira) need their own escaping; use the JSON, which is the exact unescaped copy, as the source for those. Files are written atomically, with a short hash in each file name so two items never overwrite each other. Dispositions (`assigned`, `risk-accepted`, `false-positive`, `needs-info`) are one appended JSON line each in a local log; the latest entry per item wins. The analyst name is free text, so the log is a worklog, not an audit trail.
 
 ## Known limitations
 
@@ -40,7 +60,7 @@ Exports are deterministic (no wall-clock time) and written only on request with 
 
 ## Data flows
 
-The engine makes no network calls. The one outbound path is `scripts/fetch_tenable.py`: it reads from the Tenable API (including creating a vulnerability export job on Tenable's side) and saves the result under `data/raw/`, which is gitignored. API keys are read from environment variables only. Local writes are `record_disposition` (append-only JSONL, requires `confirm=true`) and `export_case` file output (fixed directory, requires `confirm=true`). No tool changes any external system.
+The engine and the MCP server make no network calls. The one outbound path is `scripts/fetch_tenable.py`: it reads from the Tenable API (including creating a vulnerability export job on Tenable's side) and saves the result under `data/raw/`, which is gitignored. API keys are read from environment variables only. Local writes are `record_disposition` (append-only JSONL, requires `confirm=true`) and `export_case` file output (fixed directory, requires `confirm=true`). No tool changes any external system.
 
 ## Data sources and licensing
 

@@ -18,13 +18,23 @@ Python >=3.10 is required (the machine's default `python` is 3.9; use `uv`).
 uv sync                                    # create .venv with pinned deps
 uv run pytest                              # all tests
 uv run pytest tests/test_x.py::test_name   # single test
+EXPOSURE_CASE_DATA=data/sample uv run python -m exposure_case.server   # stdio MCP server on the committed sample
 ```
 
-There is no lint or build command yet; add them here when they exist.
+Checks run before every commit (the tools are not project dependencies; `uvx`/`uv run --with` fetch them on demand):
+
+```bash
+uvx ruff check src scripts tests --line-length 120
+uvx mypy src scripts --ignore-missing-imports
+uv run --with coverage coverage run --source=src/exposure_case,scripts -m pytest -q && uv run --with coverage coverage report
+gitleaks git --staged --no-banner          # also runs in the pre-commit hook
+```
+
+There is no build step. Tests that spawn the MCP server use the committed `data/sample`.
 
 ## Architecture
 
-A deterministic stdlib-only engine (`src/exposure_case/`: ingest, clustering, scoring, case assembly, export, disposition log) wrapped by a thin stdio MCP server (`server.py`), plus a Claude Code skill (`skills/exposure-case/SKILL.md`) and a playbook that chain the tools. Code clusters, scores and collects evidence, Claude narrates, the human decides. Tool schemas and the scoring table are in `docs/PLAN.md`.
+A deterministic stdlib-only engine (`src/exposure_case/`: `ingest`, `cluster` and `fixes` build cases and fix packages, `links` joins them, `scoring`, `timeline`, `case`, `export`, `disposition`) behind `service.py` (one `Workspace` that answers every tool question as capped JSON), wrapped by a thin stdio MCP server (`server.py`), plus a Claude Code skill (`skills/exposure-case/SKILL.md`) and a playbook (`playbooks/`) that chain the tools. `tests/test_skill.py` keeps the skill in step with the server's tools. Code clusters, scores and collects evidence, Claude narrates, the human decides. Tool schemas and the scoring table are in `docs/PLAN.md`.
 
 The MCP server uses `mcp==2.3.0`. In 2.x, `FastMCP` was renamed: use `from mcp.server.mcpserver import MCPServer`. Older tutorials will not work.
 
