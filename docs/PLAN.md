@@ -139,7 +139,11 @@ Unit tests per module (test first, RED observed), the MCP contract tests (real s
 
 ## Status
 
-Last updated: 2026-11-02, afternoon. 543 tests pass at 96% branch coverage on Python 3.10 and 3.14; ruff, black, mypy, bandit and the standards checker are clean; full-history secret scan clean. Everything buildable without the user is built; the open items are the submission checklist above.
+Last updated: 2026-11-02, late afternoon (HEAD `75aa694` or later). 557 tests pass at 96% branch coverage on Python 3.10 and 3.14; `sh scripts/check_all.sh` (ruff, black, mypy, bandit, standards checker, coverage gate) is clean; full-history secret scan clean. Everything buildable without the user is built; the open items are the submission checklist above.
+
+Antivirus note: BitDefender quarantined pytest's `lastfailed` cache as `Generic.DDE.Exploit` (test ids embedded the Excel-DDE payload our CSV test uses). Fixed in code (`75aa694`: payload assembled from parts, neutral hostile test ids, guard in `tests/test_hygiene.py`; see `docs/ENGINEERING_AUDIT.md`). The exact path `.pytest_cache\\v\\cache\\lastfailed` is still write-blocked by BitDefender on this machine; the restored file was moved out of the project (it lives under the session scratchpad in Temp). Clearing it needs a BitDefender exception for `.pytest_cache`. Harmless: only a pytest warning when a test fails.
+
+Session log with the full what-worked / what-failed record: `~/.claude/session-data/2026-11-02-exposure-case-session.tmp`.
 
 ## Resuming in a new session
 
