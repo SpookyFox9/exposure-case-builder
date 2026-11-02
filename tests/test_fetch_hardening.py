@@ -7,7 +7,7 @@ from test_fetch_tenable import FakeTenable, client, ft, routes
 def routes_with(status_body=None):
     r = routes()
     if status_body is not None:
-        r[("GET", "/vulns/export/E1/status")] = status_body
+        r[("GET", "/vulns/export/0a1b2c3d-4e5f-6789-abcd-ef0123456789/status")] = status_body
     return r
 
 
@@ -31,7 +31,7 @@ def test_chunks_available_must_be_a_list(tmp_path):
 @pytest.mark.parametrize("body", [[1, 2], None, "x"])
 def test_non_dict_status_is_fetch_error(tmp_path, body):
     fake = FakeTenable(routes_with(body))
-    fake.routes[("GET", "/vulns/export/E1/status")] = lambda: body
+    fake.routes[("GET", "/vulns/export/0a1b2c3d-4e5f-6789-abcd-ef0123456789/status")] = lambda: body
     with pytest.raises(ft.FetchError, match="status"):
         ft.fetch(client(fake), tmp_path / "out", sleep=lambda s: None)
 
@@ -48,7 +48,7 @@ def test_empty_chunk_list_is_an_error(tmp_path):
 
 def test_partial_failure_cleans_up_so_retry_works(tmp_path):
     r = routes()
-    del r[("GET", "/vulns/export/E1/chunks/2")]  # chunk 2 -> 404
+    del r[("GET", "/vulns/export/0a1b2c3d-4e5f-6789-abcd-ef0123456789/chunks/2")]  # chunk 2 -> 404
     out = tmp_path / "out"
     with pytest.raises(ft.FetchError):
         ft.fetch(client(FakeTenable(r)), out, sleep=lambda s: None)

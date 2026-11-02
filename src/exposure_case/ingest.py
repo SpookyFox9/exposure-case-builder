@@ -22,7 +22,9 @@ from .schema import Evidence
 
 VALID_STATES = frozenset({"OPEN", "REOPENED", "FIXED"})
 VALID_SEVERITIES = frozenset({"info", "low", "medium", "high", "critical"})
-MAX_FILE_BYTES = 256 * 1024 * 1024  # largest export chunk seen is about 36 MB
+MAX_FILE_BYTES = 128 * 1024 * 1024  # largest export chunk seen is about 36 MB
+MAX_TOTAL_BYTES = 1024 * 1024 * 1024  # a 160-host tenant is about 108 MB in total
+MAX_CHUNK_FILES = 1000
 MAX_TEXT_CHARS = 4096  # per free-text field (solution, plugin output is allowed twice this)
 MAX_LIST_ITEMS = 100  # per list field (CVEs, advisory links, CPEs)
 TRUNCATION_MARKER = "… [truncated]"
@@ -271,6 +273,14 @@ def iter_raw_records(root: str | Path) -> Iterator[tuple[str, int, Any]]:
     files = sorted(chunk_dir.glob("*.json"), key=_chunk_order)
     if not files:
         raise IngestError(f"no chunk files in {chunk_dir}")
+    if len(files) > MAX_CHUNK_FILES:
+        raise IngestError(f"too many chunk files ({len(files)}; limit {MAX_CHUNK_FILES})")
+    try:
+        total = sum(path.stat().st_size for path in files)
+    except OSError as exc:
+        raise IngestError(f"cannot read chunk files: {type(exc).__name__}") from None
+    if total > MAX_TOTAL_BYTES:
+        raise IngestError(f"chunk files total {total} bytes, over the {MAX_TOTAL_BYTES} byte limit")
     for path in files:
         data = read_json_file(path)
         if not isinstance(data, list):
@@ -295,10 +305,6 @@ def load_findings(root: str | Path) -> tuple[FindingRecord, ...]:
     return tuple(records)
 
 
-def _opt_float(value: Any) -> float | None:
-    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
-
-
 def load_plugin_info(root: str | Path) -> dict[int, PluginInfo]:
     """Load ``plugins.json`` if present; an absent file means no plugin context."""
     path = Path(root) / "plugins.json"
@@ -317,8 +323,8 @@ def load_plugin_info(root: str | Path) -> dict[int, PluginInfo]:
         info[plugin_id] = PluginInfo(
             plugin_id=plugin_id,
             count=_opt_int(row.get("count")) or 0,
-            vpr_score=_opt_float(row.get("vpr_score")),
-            cvss_base_score=_opt_float(row.get("cvss_base_score")),
-            cvss3_base_score=_opt_float(row.get("cvss3_base_score")),
+            vpr_score=_opt_number(row.get("vpr_score")),
+            cvss_base_score=_opt_number(row.get("cvss_base_score")),
+            cvss3_base_score=_opt_number(row.get("cvss3_base_score")),
         )
     return info

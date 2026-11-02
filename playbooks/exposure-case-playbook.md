@@ -21,8 +21,9 @@ tells you how to set it up, run a triage session and share the results.
    account, point `EXPOSURE_CASE_DATA` at `data/sample` (a trimmed, fake, masked sample).
 6. Copy `skills/exposure-case` to `~/.claude/skills/` (or your project's `.claude/skills/`).
 
-Optional settings: `EXPOSURE_CASE_EXPORTS` (default `./exports`) and `EXPOSURE_CASE_DISPOSITIONS` (default
-`./dispositions.jsonl`). Both are gitignored.
+Optional settings: `EXPOSURE_CASE_EXPORTS` (default `~/.exposure-case/exports`) and `EXPOSURE_CASE_DISPOSITIONS`
+(default `~/.exposure-case/dispositions.jsonl`). Both must be absolute paths if you set them, so output never lands in
+whatever directory the server was started from.
 
 ## 2. A triage session
 

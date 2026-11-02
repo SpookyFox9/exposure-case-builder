@@ -6,17 +6,19 @@ Tenable or any other system, and no tool accepts a file path. stdout carries onl
 else goes to stderr.
 
 Configuration (environment variables, or ``--data``):
-  EXPOSURE_CASE_DATA          directory with a saved Tenable export (``chunks/``, optional ``plugins.json``)
-  EXPOSURE_CASE_EXPORTS       where export files are written (default ./exports)
-  EXPOSURE_CASE_DISPOSITIONS  the disposition log (default ./dispositions.jsonl)
+  EXPOSURE_CASE_DATA          absolute path of a saved Tenable export (``chunks/``, optional ``plugins.json``)
+  EXPOSURE_CASE_EXPORTS       where export files are written (default ~/.exposure-case/exports)
+  EXPOSURE_CASE_DISPOSITIONS  the disposition log (default ~/.exposure-case/dispositions.jsonl)
+The two optional paths must be absolute: nothing is ever written relative to the working directory.
 """
 
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import wraps
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -26,7 +28,10 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field, StrictBool
 
+from .disposition import MAX_ANALYST_CHARS, MAX_NOTE_CHARS
 from .service import ServiceError, Workspace
+
+log = logging.getLogger("exposure_case.server")
 
 INSTRUCTIONS = """\
 Exposure Case Builder turns a Tenable export into ranked cases (what is risky) and fix packages (what to do).
@@ -63,12 +68,10 @@ def _guard(fn: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
-def build_server(workspace: Workspace) -> MCPServer:
-    mcp = MCPServer(name="exposure-case", instructions=INSTRUCTIONS)
-
+def _register_read_tools(mcp: MCPServer, workspace: Workspace) -> None:
     @mcp.tool(annotations=READ_ONLY)
     @_guard
-    def fleet_summary() -> dict:
+    def fleet_summary() -> dict[str, Any]:
         """Totals for the loaded export: hosts, active findings by severity, case and fix-package counts, KEV."""
         return workspace.fleet_summary()
 
@@ -76,39 +79,41 @@ def build_server(workspace: Workspace) -> MCPServer:
     @_guard
     def case_queue(
         kind: Literal["both", "threats", "backlogs"] = "both", top_n: int = 10, hide_dispositioned: bool = False
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Ranked cases. kind: 'both' (default; returns threats and backlogs as two lists), 'threats' (one
         vulnerability each) or 'backlogs' (a patch family each). Each row says why it ranks where it does.
         'rank' is the global rank; 'position' is the place in this list. hide_dispositioned hides any item
-        with a recorded disposition, including needs-info."""
+        with a recorded disposition, including needs-info, and reports how many it hid."""
         return workspace.case_queue(kind, top_n, hide_dispositioned)
 
     @mcp.tool(annotations=READ_ONLY)
     @_guard
-    def fix_queue(top_n: int = 10, hide_dispositioned: bool = False) -> dict:
+    def fix_queue(top_n: int = 10, hide_dispositioned: bool = False) -> dict[str, Any]:
         """Ranked fix packages (product plus kind of fix) with what each contains and how many distinct actions."""
         return workspace.fix_queue(top_n, hide_dispositioned)
 
     @mcp.tool(annotations=READ_ONLY)
     @_guard
-    def case_file(case_id: str, max_hosts: int = 25, max_vulns: int = 15, max_events: int = 40) -> dict:
+    def case_file(case_id: str, max_hosts: int = 25, max_vulns: int = 15, max_events: int = 40) -> dict[str, Any]:
         """One case: score breakdown, facts, the fix packages that address it, top vulnerabilities, hosts,
         timeline, limitations and any recorded disposition. Lists are capped; *_total fields give the full size."""
         return workspace.case_file(case_id, max_hosts, max_vulns, max_events)
 
     @mcp.tool(annotations=READ_ONLY)
     @_guard
-    def fix_package(package_id: str, max_hosts: int = 25, max_actions: int = 15) -> dict:
+    def fix_package(package_id: str, max_hosts: int = 25, max_actions: int = 15) -> dict[str, Any]:
         """One fix package: Tenable's fix actions with what each clears, contained impact, hosts, CVEs and
         advisories, and the cases it relieves. Totals are contained in the package, not cleared by one action."""
         return workspace.fix_package(package_id, max_hosts, max_actions)
 
     @mcp.tool(annotations=READ_ONLY)
     @_guard
-    def findings(item_id: str, limit: int = 25, offset: int = 0) -> dict:
+    def findings(item_id: str, limit: int = 25, offset: int = 0) -> dict[str, Any]:
         """The real finding records behind a case or fix package (sorted by finding id, paged). Cite these ids."""
         return workspace.findings(item_id, limit, offset)
 
+
+def _register_write_tools(mcp: MCPServer, workspace: Workspace) -> None:
     @mcp.tool(annotations=LOCAL_WRITE)
     @_guard
     def export(
@@ -116,7 +121,7 @@ def build_server(workspace: Workspace) -> MCPServer:
         format: Literal["markdown", "hosts_csv", "actions_csv", "json"] = "markdown",
         write: StrictBool = False,
         confirm: StrictBool = False,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Render a case or fix package. format: markdown, hosts_csv, actions_csv (packages only) or json (write
         only). write=true saves ALL formats (format is ignored) to the export directory, replacing files of the
         same name, and needs confirm=true after the analyst approves. Inline results are size-capped."""
@@ -126,34 +131,66 @@ def build_server(workspace: Workspace) -> MCPServer:
     @_guard
     def record_disposition(
         item_id: str,
-        analyst: Annotated[str, Field(max_length=200)],
+        analyst: Annotated[str, Field(max_length=MAX_ANALYST_CHARS)],
         disposition: Literal["assigned", "risk-accepted", "false-positive", "needs-info"],
-        note: Annotated[str, Field(max_length=4000)],
+        note: Annotated[str, Field(max_length=MAX_NOTE_CHARS)],
         confirm: StrictBool = False,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Record the analyst's decision as one appended line in the local log. Only after the analyst has stated
         the decision and approved this exact entry; then pass confirm=true. The note is the analyst's own words."""
         return workspace.record_disposition(item_id, analyst, disposition, note, confirm)
 
+
+def build_server(workspace: Workspace) -> MCPServer:
+    mcp = MCPServer(name="exposure-case", instructions=INSTRUCTIONS)
+    _register_read_tools(mcp, workspace)
+    _register_write_tools(mcp, workspace)
     return mcp
+
+
+def _absolute(env: Mapping[str, str], name: str, default: Path | None = None) -> Path:
+    raw = env.get(name)
+    if raw is None or not raw.strip():
+        if default is None:
+            raise ValueError(f"set {name} (or pass --data)")
+        return default
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        raise ValueError(f"{name} must be an absolute path")
+    return path
+
+
+def resolve_paths(env: Mapping[str, str], home: Path) -> tuple[Path, Path, Path]:
+    """The data directory, export directory and disposition log. Never relative to the working directory."""
+    data = _absolute(env, "EXPOSURE_CASE_DATA").resolve()
+    base = home / ".exposure-case"
+    exports = _absolute(env, "EXPOSURE_CASE_EXPORTS", base / "exports")
+    log_path = _absolute(env, "EXPOSURE_CASE_DISPOSITIONS", base / "dispositions.jsonl")
+    return data, exports, log_path
+
+
+def _configure_logging() -> None:
+    """Diagnostics go to stderr only; stdout belongs to the protocol."""
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    log.handlers[:] = [handler]
+    log.setLevel(logging.INFO)
+    log.propagate = False
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Exposure Case Builder MCP server (stdio)")
     parser.add_argument("--data", help="directory with a saved Tenable export (default: $EXPOSURE_CASE_DATA)")
     args = parser.parse_args(argv)
-    data = args.data or os.environ.get("EXPOSURE_CASE_DATA")
-    if not data:
-        print("error: set EXPOSURE_CASE_DATA or pass --data", file=sys.stderr)
-        return 1
+    _configure_logging()
+    env = dict(os.environ)
+    if args.data:
+        env["EXPOSURE_CASE_DATA"] = args.data
     try:
-        workspace = Workspace.load(
-            Path(data),
-            exports_dir=Path(os.environ.get("EXPOSURE_CASE_EXPORTS", "exports")),
-            dispositions_path=Path(os.environ.get("EXPOSURE_CASE_DISPOSITIONS", "dispositions.jsonl")),
-        )
-    except ServiceError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        data, exports, log_path = resolve_paths(env, Path.home())
+        workspace = Workspace.load(data, exports_dir=exports, dispositions_path=log_path)
+    except (ValueError, ServiceError) as exc:
+        log.error("error: %s", exc)
         return 1
     build_server(workspace).run()
     return 0

@@ -49,7 +49,7 @@ def test_fleet_summary_is_consistent(ws, records):
 
 def test_case_queue_returns_two_lists_by_default(ws):
     q = ws.case_queue(top_n=5)
-    assert set(q) == {"threats", "backlogs", "as_of"}
+    assert set(q) == {"threats", "backlogs", "hidden_dispositioned", "as_of"}
     assert all(i["kind"] == "plugin" for i in q["threats"])
     assert all(i["kind"] == "patch_family" for i in q["backlogs"])
     assert len(q["threats"]) <= 5 and len(q["backlogs"]) <= 5
@@ -71,7 +71,7 @@ def test_queue_rows_explain_themselves(ws):
 
 def test_single_kind_queue_shape(ws):
     q = ws.case_queue(kind="backlogs", top_n=3)
-    assert set(q) == {"kind", "items", "as_of"} and q["kind"] == "backlogs"
+    assert set(q) == {"kind", "items", "hidden_dispositioned", "as_of"} and q["kind"] == "backlogs"
 
 
 @pytest.mark.parametrize("kwargs", [{"kind": "everything"}, {"top_n": 0}, {"top_n": 51}, {"top_n": "5"}])

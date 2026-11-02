@@ -103,11 +103,11 @@ def test_sample_is_deterministic(source, tmp_path):
 
 def test_sample_strips_unused_fields_and_truncates_output(source, tmp_path):
     out = tmp_path / "out"
-    ms.build_sample(source, out, n_plugins=2, n_notable=0, output_chars=40)
+    ms.build_sample(source, out, n_plugins=2, n_notable=0)
     r = json.loads((out / "chunks" / "chunk_1.json").read_text(encoding="utf-8"))[0]
     assert "indexed" not in r and "network_id" not in r["asset"]
     assert "description" not in r["plugin"] and "xrefs" not in r["plugin"]
-    assert len(r["output"]) <= 40
+    assert "output" not in r  # plugin output can hold personal data and is never exposed by a tool
 
 
 def test_sample_plugin_rows_limited_to_kept_plugins(source, tmp_path):

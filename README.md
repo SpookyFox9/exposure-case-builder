@@ -52,7 +52,7 @@ and point `EXPOSURE_CASE_DATA` at `data/raw/<name>`. `playbooks/exposure-case-pl
 
 **MCP tools.** Read-only: `fleet_summary`, `case_queue` (single-vulnerability *threats* and patch *backlogs* as two lists, so backlogs cannot bury threats), `fix_queue`, `case_file`, `fix_package`, and `findings` (the real finding IDs behind a case, to cite). Local writes, each needing `confirm=true`: `export` with `write=true`, and `record_disposition`. No tool accepts a file path.
 
-Optional settings: `EXPOSURE_CASE_EXPORTS` (default `./exports`) and `EXPOSURE_CASE_DISPOSITIONS` (default `./dispositions.jsonl`); both are gitignored.
+Optional settings (absolute paths only; relative ones are rejected so output never lands in whatever directory the server happened to start in): `EXPOSURE_CASE_EXPORTS` (default `~/.exposure-case/exports`) and `EXPOSURE_CASE_DISPOSITIONS` (default `~/.exposure-case/dispositions.jsonl`). The disposition log is single-writer: run one server per log.
 
 ## Outputs
 
@@ -97,6 +97,8 @@ Every outbound destination, scope and state-changing action:
   - `POST /vulns/export` with `{"num_assets": 50, "filters": {"state": ["open", "reopened", "fixed"]}}`. **This creates a vulnerability export job on Tenable's side.** That is the only state change and it touches no tenant data.
   - `GET /vulns/export/{uuid}/status` and `GET /vulns/export/{uuid}/chunks/{n}`, to poll and download that job.
   - `GET /workbenches/vulnerabilities?date_range=90`, plugin-level counts used only to cross-check the export.
+  - Redirects are never followed (a redirect would forward the API keys), response bodies are capped at 128 MB, and the
+    export id and chunk list are validated before they become URLs or file names.
 - **What is sent:** the API key pair in the `X-ApiKeys` header, the User-Agent below, and the request bodies above. Nothing from your environment beyond that.
 - **Scope:** apart from creating the export job, the calls above only read data, so a read-only key should be enough. It was developed with a limited-permission key (one that could not read the audit log, HTTP 403); the exact minimum role Tenable requires for vulnerability exports is not verified here.
 - **User-Agent:** every request sends Tenable's standard integration header, `Integration/1.0 (VENDOR; PRODUCT; Build/VERSION)` ([Tenable's User-Agent guide](https://developer.tenable.com/docs/user-agent-header)). The vendor defaults to the project name; set `TENABLE_UA_VENDOR` to your own company or team name so Tenable can tell whose integration it is.

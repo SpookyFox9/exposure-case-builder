@@ -17,6 +17,7 @@ import argparse
 import http.client
 import importlib.metadata
 import json
+import logging
 import os
 import re
 import shutil
@@ -35,6 +36,10 @@ POLL_INTERVAL_S = 5
 MAX_POLLS = 360  # 30 minutes at 5 s
 PLUGIN_PATH = "/workbenches/vulnerabilities?date_range=90"
 EXPORT_STATES = ["open", "reopened", "fixed"]
+MAX_RESPONSE_BYTES = 128 * 1024 * 1024  # largest real export chunk is about 36 MB; matches the ingest limit
+MAX_CHUNKS = 1000
+_EXPORT_UUID = re.compile(r"[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
+log = logging.getLogger("fetch_tenable")
 
 
 class FetchError(RuntimeError):
@@ -84,6 +89,16 @@ def user_agent(vendor: str | None = None, product: str | None = None, build: str
     return f"Integration/1.0 ({vendor_text}; {product_text}; Build/{build_text})"
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect: urllib would copy the X-ApiKeys header to wherever it points."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        return None
+
+
+_OPEN_WITHOUT_REDIRECTS = urllib.request.build_opener(_NoRedirect).open
+
+
 class TenableClient:
     """Holds the API keys privately: no __dict__, and a fixed repr that never shows them."""
 
@@ -93,7 +108,7 @@ class TenableClient:
         self,
         access_key: str,
         secret_key: str,
-        opener: Callable[..., Any] = urllib.request.urlopen,
+        opener: Callable[..., Any] = _OPEN_WITHOUT_REDIRECTS,
         agent: str | None = None,
     ):
         self._auth = f"accessKey={access_key};secretKey={secret_key}"
@@ -116,7 +131,12 @@ class TenableClient:
         req = urllib.request.Request(BASE_URL + path, data=data, headers=self._headers(), method=method)
         try:
             with self._opener(req, timeout=REQUEST_TIMEOUT_S) as resp:
-                return json.load(resp)
+                raw = resp.read(MAX_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_RESPONSE_BYTES:
+                raise FetchError(f"{method} {path} response too large (limit {MAX_RESPONSE_BYTES} bytes)")
+            return json.loads(raw)
+        except FetchError:
+            raise
         except urllib.error.HTTPError as exc:
             raise FetchError(f"{method} {path} failed: HTTP {exc.code}") from None
         except urllib.error.URLError as exc:
@@ -128,8 +148,18 @@ class TenableClient:
 
 
 def _write_json(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data), encoding="utf-8")
+    """Write via a temp file and ``os.replace`` so a failure never leaves a half-written file."""
+    tmp = path.with_name(f".{path.name}.tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)  # raw data holds hostnames and IPs
+        tmp.unlink(missing_ok=True)
+        with open(tmp, "x", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        os.replace(tmp, path)
+    except OSError as exc:
+        raise FetchError(f"cannot write {path.name}: {type(exc).__name__}") from None
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def _validated_chunk_ids(status: dict) -> list[int]:
@@ -142,6 +172,8 @@ def _validated_chunk_ids(status: dict) -> list[int]:
         raise FetchError("export status has an invalid chunk list")
     if not chunks:
         raise FetchError("export finished with no chunks")
+    if len(chunks) > MAX_CHUNKS:
+        raise FetchError(f"export lists too many chunks ({len(chunks)}; limit {MAX_CHUNKS})")
     if any(isinstance(c, bool) or not isinstance(c, int) or c < 1 for c in chunks):
         raise FetchError("export status has an invalid chunk id")
     return chunks
@@ -175,14 +207,16 @@ def fetch(
     On any failure the files this call wrote are removed so a retry can reuse the path.
     """
     out_dir = Path(out_dir)
+    if out_dir.is_symlink():
+        raise FetchError("output directory is a symlink; choose a real directory")
     if out_dir.exists() and any(out_dir.iterdir()):
         raise FetchError(f"output directory is not empty: {out_dir}")
     created = not out_dir.exists()
     try:
         job = client.request("POST", "/vulns/export", {"num_assets": chunk_assets, "filters": {"state": EXPORT_STATES}})
         export_uuid = job.get("export_uuid") if isinstance(job, dict) else None
-        if not isinstance(export_uuid, str) or not export_uuid.strip():
-            raise FetchError("export job did not return an export_uuid")
+        if not isinstance(export_uuid, str) or not _EXPORT_UUID.fullmatch(export_uuid):
+            raise FetchError("export job did not return a valid export_uuid")
         chunk_ids = _validated_chunk_ids(_poll_until_finished(client, export_uuid, sleep, max_polls))
         for chunk_id in chunk_ids:
             chunk = client.request("GET", f"/vulns/export/{export_uuid}/chunks/{chunk_id}")
@@ -210,13 +244,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=Path("data/raw") / stamp)
     parser.add_argument("--chunk-assets", type=_positive_int, default=50, help="assets per export chunk")
     args = parser.parse_args(argv)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    log.handlers[:] = [handler]
+    log.setLevel(logging.INFO)
+    log.propagate = False
     try:
         access, secret = keys_from_env()
         out = fetch(TenableClient(access, secret), args.out, args.chunk_assets)
     except (FetchError, OSError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        log.error("error: %s", exc)
         return 1
-    print(f"saved export to {out}")
+    log.info("saved export to %s", out)
     return 0
 
 

@@ -21,6 +21,7 @@ import io
 import json
 import math
 import os
+import re
 import unicodedata
 from collections.abc import Iterable
 from pathlib import Path
@@ -46,6 +47,8 @@ EVENT_LABELS = {
 _STRIPPED_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})  # control, format (bidi, zero-width), line/paragraph sep
 _FORMULA_START = ("=", "+", "-", "@")
 _MARKDOWN_ESCAPES = "<>[]"
+# Bare URLs are auto-linked by GitHub-flavoured renderers, so they are shown as code spans instead.
+_URL = re.compile(r"\b(?:(?:https?|ftp)://|www\.)[^\s<>\[\]()`]*")
 
 
 class ExportError(ValueError):
@@ -63,17 +66,29 @@ def _clean(value: object, keep_newline: bool = False) -> str:
     )
 
 
-def md_text(value: object) -> str:
-    """Single-line Markdown text in which no tag, link or image can form."""
-    text = _clean(value).replace("\\", "\\\\")  # escape backslashes FIRST, or they can cancel our escapes
+def _escape_plain(text: str) -> str:
+    text = text.replace("\\", "\\\\")  # escape backslashes FIRST, or they can cancel our escapes
     for ch in _MARKDOWN_ESCAPES:
         text = text.replace(ch, "\\" + ch)
-    return " ".join(text.split())
+    return text.replace("`", "'")
+
+
+def md_text(value: object) -> str:
+    """Single-line Markdown text in which no tag, link or image can form and no URL is clickable."""
+    cleaned = _clean(value)
+    pieces: list[str] = []
+    position = 0
+    for match in _URL.finditer(cleaned):
+        pieces.append(_escape_plain(cleaned[position : match.start()]))
+        pieces.append("`" + match.group().replace("`", "'") + "`")
+        position = match.end()
+    pieces.append(_escape_plain(cleaned[position:]))
+    return " ".join("".join(pieces).split())
 
 
 def md_cell(value: object) -> str:
     """``md_text`` that is also safe inside a Markdown table cell."""
-    return md_text(value).replace("|", "\\|").replace("`", "'")
+    return md_text(value).replace("|", "\\|")
 
 
 def md_code(value: object) -> str:
@@ -160,7 +175,7 @@ def _capped_list(items: tuple[str, ...], cap: int, code: bool = False) -> list[s
 
 def _action_rows(actions: Iterable[FixAction]) -> list[list[object]]:
     return [
-        [a.solution, a.plugins, a.hosts, a.worst_severity, _pct(a.critical_share) if a.critical_findings else "–"]
+        [a.solution, a.plugins, a.hosts, a.worst_severity, _pct(a.critical_share) if a.critical_findings else "\u2013"]
         for a in actions
     ]
 
@@ -381,7 +396,10 @@ def case_markdown(
         earlier = len(cf.timeline) - len(events)
         lines += [
             "",
-            f"Showing the latest {len(events)} of {len(cf.timeline)} dated events; {earlier} earlier events are in the JSON.",
+            (
+                f"Showing the latest {len(events)} of {len(cf.timeline)} dated events; "
+                f"{earlier} earlier events are in the JSON."
+            ),
         ]
     lines += [
         "",
@@ -392,8 +410,8 @@ def case_markdown(
         "## Source records",
         "",
         (
-            f"{plural(len(cf.evidence_ids), 'Tenable finding ID')} support this case; they are listed in the JSON export "
-            "(`evidence_ids`)."
+            f"{plural(len(cf.evidence_ids), 'Tenable finding ID')} support this case; "
+            "they are listed in the JSON export (`evidence_ids`)."
         ),
         "",
         "## Disposition",

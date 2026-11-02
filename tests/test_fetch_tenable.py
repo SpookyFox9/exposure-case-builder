@@ -12,6 +12,9 @@ ft = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ft)
 
 
+EXPORT_ID = "0a1b2c3d-4e5f-6789-abcd-ef0123456789"
+
+
 class FakeResponse(io.BytesIO):
     def __enter__(self):
         return self
@@ -41,10 +44,13 @@ class FakeTenable:
 def routes(status_sequence=("FINISHED",)):
     seq = iter(status_sequence)
     return {
-        ("POST", "/vulns/export"): {"export_uuid": "E1"},
-        ("GET", "/vulns/export/E1/status"): lambda: {"status": next(seq), "chunks_available": [1, 2]},
-        ("GET", "/vulns/export/E1/chunks/1"): [{"finding_id": "a"}],
-        ("GET", "/vulns/export/E1/chunks/2"): [{"finding_id": "b"}],
+        ("POST", "/vulns/export"): {"export_uuid": EXPORT_ID},
+        ("GET", "/vulns/export/0a1b2c3d-4e5f-6789-abcd-ef0123456789/status"): lambda: {
+            "status": next(seq),
+            "chunks_available": [1, 2],
+        },
+        ("GET", "/vulns/export/0a1b2c3d-4e5f-6789-abcd-ef0123456789/chunks/1"): [{"finding_id": "a"}],
+        ("GET", "/vulns/export/0a1b2c3d-4e5f-6789-abcd-ef0123456789/chunks/2"): [{"finding_id": "b"}],
         ("GET", "/workbenches/vulnerabilities?date_range=90"): {"vulnerabilities": [{"plugin_id": 1}]},
     }
 

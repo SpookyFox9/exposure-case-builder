@@ -3,7 +3,8 @@
 Deterministic and cluster-oriented: keeps every non-info finding for the top plugins by
 number of affected assets, plus a few notable plugins (exploited by malware or with a
 reopened finding), across all assets. Strips fields the engine never reads and truncates
-plugin output. The competition tenant data is fake and masked; the full export stays
+plugin output (it can contain people's names and email addresses, and no tool exposes it).
+The competition tenant data is fake and masked; the full export stays
 gitignored under data/raw/.
 
 Usage:
@@ -14,11 +15,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import Any
 
 from exposure_case.ingest import IngestError, iter_raw_records, parse_record, read_json_file
+
+log = logging.getLogger("make_sample")
 
 ASSET_KEYS = ("uuid", "hostname", "ipv4", "device_type", "operating_system")
 PLUGIN_KEYS = (
@@ -42,9 +46,8 @@ def _pick(obj: Any, keys: tuple[str, ...]) -> dict:
     return {k: obj[k] for k in keys if isinstance(obj, dict) and k in obj}
 
 
-def _trim(record: dict, output_chars: int) -> dict:
+def _trim(record: dict) -> dict:
     out = _pick(record, TOP_KEYS)
-    out["output"] = str(record.get("output") or "")[:output_chars]
     out["asset"] = _pick(record.get("asset"), ASSET_KEYS)
     out["plugin"] = _pick(record.get("plugin"), PLUGIN_KEYS)
     out["port"] = _pick(record.get("port"), PORT_KEYS)
@@ -79,7 +82,7 @@ def _select_plugins(records: list[dict], n_plugins: int, n_notable: int) -> set[
     return set(top) | set(extra)
 
 
-def build_sample(src: Path, out: Path, n_plugins: int = 40, n_notable: int = 10, output_chars: int = 200) -> Path:
+def build_sample(src: Path, out: Path, n_plugins: int = 40, n_notable: int = 10) -> Path:
     src, out = Path(src), Path(out)
     if out.exists() and any(out.iterdir()):
         raise ValueError(f"output directory is not empty: {out}")
@@ -90,7 +93,7 @@ def build_sample(src: Path, out: Path, n_plugins: int = 40, n_notable: int = 10,
         raise ValueError("no non-info findings in the source export")
     keep = _select_plugins(records, n_plugins, n_notable)
 
-    kept = [_trim(r, output_chars) for r in records if r["plugin"]["id"] in keep]
+    kept = [_trim(r) for r in records if r["plugin"]["id"] in keep]
     plugins_path = src / "plugins.json"
     rows: list = []
     if plugins_path.is_file():
@@ -120,12 +123,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--plugins", type=int, default=40, help="top plugins by affected-asset count")
     parser.add_argument("--notable", type=int, default=10, help="extra malware-exploited or reopened plugins")
     args = parser.parse_args(argv)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    log.handlers[:] = [handler]
+    log.setLevel(logging.INFO)
+    log.propagate = False
     try:
         out = build_sample(args.src, args.out, args.plugins, args.notable)
     except (ValueError, OSError) as exc:  # IngestError is a ValueError
-        print(f"error: {exc}", file=sys.stderr)
+        log.error("error: %s", exc)
         return 1
-    print(f"wrote sample to {out}")
+    log.info("wrote sample to %s", out)
     return 0
 
 

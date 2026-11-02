@@ -128,10 +128,7 @@ def test_csv_round_trips_non_ascii(world, tmp_path):  # noqa: F811
     recs = [dataclasses.replace(fx("f1"), hostname="srv-é-日本")]
     _, packages, links = build(recs)
     text = package_hosts_csv(build_package_view(packages[0], links, NOW))
-    assert (
-        "srv-é-日本" in next(csv.reader(io.StringIO(text), skipinitialspace=False))[1:2] + [text]
-        or "srv-é-日本" in text
-    )
+    assert "srv-é-日本" in [cell for row in csv.reader(io.StringIO(text)) for cell in row]
 
 
 # --- percentages ---

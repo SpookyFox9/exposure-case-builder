@@ -186,8 +186,6 @@ def test_exploit_reason_tie_is_resolved_by_text_not_position():
     family = "Red Hat Local Security Checks"
     a = fx("f1", plugin=1, exploit_available=False, vpr={"score": 9.1})
     b = fx("f2", plugin=2, exploit_available=False, vpr={"score": 9.8})
-    for r in (a, b):
-        pass
     a, b = (dataclasses.replace(r, plugin_family=family) for r in (a, b))
     d1 = [c.detail for c in score_cluster(build_clusters([a, b])[0], 100, NOW).components if c.name == "exploit"]
     d2 = [c.detail for c in score_cluster(build_clusters([b, a])[0], 100, NOW).components if c.name == "exploit"]

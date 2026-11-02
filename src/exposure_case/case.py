@@ -144,9 +144,8 @@ def facts_summary(facts: dict, as_of: datetime) -> tuple[str, ...]:
     ):
         if facts[key]:
             lines.append(f"{_plural(facts[key], 'finding')} {text}.")
-    lines.append(
-        f"The oldest finding was first seen {_plural(facts['age_days'], 'day')} before the data snapshot ({as_of.date()})."
-    )
+    age = _plural(facts["age_days"], "day")
+    lines.append(f"The oldest finding was first seen {age} before the data snapshot ({as_of.date()}).")
     return tuple(lines)
 
 
