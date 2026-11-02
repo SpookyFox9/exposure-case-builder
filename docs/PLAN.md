@@ -166,7 +166,8 @@ Fix-type rule (documented in `fixes.py`): the solution's opening verb decides. u
 1. [x] `case.py`: `CaseFile` (analyst) and `PackageView` (engineer), deterministic, JSON-ready
 2. [x] `export.py`: Markdown, CSV, JSON for both views; `write_*_export` needs `confirm=true`, never leaves the output directory; golden-file tests
 3. [x] Untrusted-text handling: CSV formula neutralization, Markdown/HTML escaping (backslash escapes so raw text stays readable), size caps with pointers to the complete JSON/CSV
-4. [x] Real-data check: all 200 packages and 815 cases render in 0.3 s; largest Markdown 12 KB, largest JSON 876 KB; no formula-capable CSV cells and no raw angle brackets
+4. [x] Security review of the exporters (python-reviewer, 2026-11-02) fixed: backslash-defeats-escape bypass (backslashes are now escaped first), link and image injection (`[ ]` escaped, advisory URLs rendered as code spans), bidi/zero-width/line-separator characters stripped, CSV leading-whitespace formula bypass, UTF-8 BOM on CSV, hash-suffixed bounded file names (collision, Windows reserved names, long names), atomic writes via temp file and `os.replace` (replaces a symlink rather than following it), floored percentages (never 100% unless exact), clearer headers ("address", "alone clears"), timeline cap keeps the most recent events, singular "1 day", tz-aware `as_of` required, unknown severities rejected at ingest. Not acted on: Slack/Jira escaping (Markdown is the documented target; JSON is the exact copy). 345 tests (1 skipped where Windows cannot create symlinks).
+5. [x] Real-data check: all 200 packages and 815 cases render in 0.5 s; largest Markdown 12 KB, largest JSON 876 KB; no formula-capable CSV cells and no raw angle brackets
 
 **Phase 5: MCP, skill, playbook**
 1. [ ] MCP server with five tools and contract tests
@@ -204,7 +205,7 @@ Last updated: 2026-11-02, Monday evening.
 - Done (Phase 2): `ingest.py`, `scripts/fetch_tenable.py`, `scripts/make_sample.py`, `data/sample/` (1.3 MB, gitleaks clean). 139 tests pass. The full export lives in `data/raw/full1` (gitignored, about 108 MB). Committed as `094e311`.
 - Done (Phase 3b): ingest fix fields, `fixes.py`, `links.py`, KEV/VPR in scoring, real fix dates in the timeline; 259 tests, ruff and mypy clean.
 - Done (Phase 3): `cluster.py`, `scoring.py`, `timeline.py`, `reconcile.py`; 139 tests pass; ruff and mypy clean. 815 cases from the full export (15 patch families, 800 plugins). Weights approved.
-- Done (Phase 4): case file and package view with Markdown/CSV/JSON exports; 303 tests, ruff and mypy clean.
+- Done (Phase 4): case file and package view with Markdown/CSV/JSON exports, security-reviewed; 345 tests, ruff and mypy clean.
 - Next: Phase 5 (MCP server with a `kind` filter on the queue, skill, playbook).
 
 ## Resuming in a new session

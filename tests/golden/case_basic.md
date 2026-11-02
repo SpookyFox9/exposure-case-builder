@@ -22,9 +22,9 @@ Case `plugin:1` · plugin · rank #1 (score 70.5/100) · data as of 2026-11-02
 | recurrence | 0.0 | 5 | 0 findings reopened after a fix |
 | patch | 5.0 | 5 | 2 findings with a vendor patch available |
 
-## Fix packages that clear this case
+## Fix packages that address this case
 
-| Package | Findings | Share of this case |
+| Package | Findings | Share of this case addressed |
 | --- | ---: | ---: |
 | v:p (patch) (fix:v-p:patch) | 2 | 100.0% |
 

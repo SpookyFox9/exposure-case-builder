@@ -1,16 +1,27 @@
 """Render cases and fix packages as Markdown, CSV and JSON.
 
-Everything Tenable supplies (solution text, hostnames, advisory URLs) is untrusted: it is neutralized
-for Markdown/HTML on the way into Markdown and for spreadsheet formulas on the way into CSV. Output is
-deterministic (no wall-clock time). File writes need ``confirm=True`` and go only to the directory given.
+Everything Tenable supplies (solution text, hostnames, advisory URLs) is untrusted and is neutralized on
+the way out:
+
+* Markdown (the supported target) - backslashes are escaped first, then ``< > [ ]``, so no tag, link or
+  image can form; advisory URLs and ids are rendered as code spans, never as live links.
+* CSV - formula-looking cells get a leading apostrophe; files carry a UTF-8 BOM so Excel reads non-ASCII.
+* Invisible and bidirectional-override characters are removed everywhere.
+
+The JSON export is the exact, unescaped copy. Other markups (Slack, Jira) need their own escaping; use the
+JSON for those. Output is deterministic (no wall-clock time). File writes need ``confirm=True``, go only to
+the directory given, and are atomic per file.
 """
 
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
-import re
+import math
+import os
+import unicodedata
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -24,12 +35,14 @@ DEFAULT_MAX_REFS = 25
 DEFAULT_MAX_VULNS = 15
 DEFAULT_MAX_EVENTS = 40
 DEFAULT_MAX_CASES = 10
+MAX_STEM_CHARS = 60
 EVENT_LABELS = {
     "first_seen": "First seen", "fixed": "Fixed", "reopened": "Reopened",
     "last_seen_reopened": "Last seen (reopened)", "last_seen_fixed": "Last seen before fix",
 }
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
-_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+_STRIPPED_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})  # control, format (bidi, zero-width), line/paragraph sep
+_FORMULA_START = ("=", "+", "-", "@")
+_MARKDOWN_ESCAPES = "<>[]"
 
 
 class ExportError(ValueError):
@@ -38,10 +51,20 @@ class ExportError(ValueError):
 
 # --- neutralizers ---
 
+def _clean(value: object, keep_newline: bool = False) -> str:
+    """Text without control, format (bidi / zero-width) or line-separator characters."""
+    text = str(value).replace("\t", " ").replace("\r", "")
+    return "".join(
+        ch for ch in text
+        if (keep_newline and ch == "\n") or unicodedata.category(ch) not in _STRIPPED_CATEGORIES
+    )
+
+
 def md_text(value: object) -> str:
-    """Single-line, markup-safe text: no control characters, no HTML, no line breaks."""
-    text = _CONTROL.sub("", str(value))
-    text = text.replace("<", "\\<").replace(">", "\\>")  # CommonMark backslash escapes: literal, never markup
+    """Single-line Markdown text in which no tag, link or image can form."""
+    text = _clean(value).replace("\\", "\\\\")  # escape backslashes FIRST, or they can cancel our escapes
+    for ch in _MARKDOWN_ESCAPES:
+        text = text.replace(ch, "\\" + ch)
     return " ".join(text.split())
 
 
@@ -50,12 +73,17 @@ def md_cell(value: object) -> str:
     return md_text(value).replace("|", "\\|").replace("`", "'")
 
 
+def md_code(value: object) -> str:
+    """A code span: literal text, never a link, and it cannot be closed early by the text itself."""
+    return "`" + " ".join(_clean(value).replace("`", "'").split()) + "`"
+
+
 def csv_cell(value: object) -> object:
-    """Numbers pass through; strings that a spreadsheet would run as a formula get a leading apostrophe."""
+    """Numbers pass through; strings a spreadsheet would run as a formula get a leading apostrophe."""
     if not isinstance(value, str):
         return value
-    text = _CONTROL.sub("", value) if value[:1] not in ("\t", "\r") else value
-    return f"'{text}" if text.startswith(_FORMULA_START) else text
+    text = _clean(value, keep_newline=True)
+    return f"'{text}" if text.lstrip().startswith(_FORMULA_START) else text
 
 
 def _csv(header: list[str], rows: Iterable[list[object]]) -> str:
@@ -76,7 +104,13 @@ def plural(n: int, word: str, many: str | None = None) -> str:
 
 
 def _pct(share: float) -> str:
-    return f"{share * 100:.1f}%"
+    """Floored to 0.1%: a near-complete share never reads as 100%, a tiny one never as 0%."""
+    if share <= 0:
+        return "0.0%"
+    if share >= 1:
+        return "100.0%"
+    pct = math.floor(share * 1000) / 10
+    return "under 0.1%" if pct < 0.1 else f"{min(pct, 99.9):.1f}%"
 
 
 def _table(header: list[str], rows: list[list[object]], right: frozenset[int] = frozenset()) -> list[str]:
@@ -100,8 +134,9 @@ def _host_section(hosts: tuple[HostLine, ...], max_hosts: int, csv_hint: bool = 
     return lines
 
 
-def _capped_list(items: tuple[str, ...], cap: int) -> list[str]:
-    lines = [f"- {md_text(i)}" for i in items[:cap]]
+def _capped_list(items: tuple[str, ...], cap: int, code: bool = False) -> list[str]:
+    render = md_code if code else md_text
+    lines = [f"- {render(i)}" for i in items[:cap]]
     if len(items) > cap:
         lines.append(f"- plus {len(items) - cap} more in the JSON")
     return lines or ["- none recorded"]
@@ -111,7 +146,7 @@ def _capped_list(items: tuple[str, ...], cap: int) -> list[str]:
 
 def _action_rows(actions: Iterable[FixAction]) -> list[list[object]]:
     return [[a.solution, a.plugins, a.hosts, a.worst_severity,
-             _pct(a.critical_share) if a.critical_findings else "\u2013"] for a in actions]
+             _pct(a.critical_share) if a.critical_findings else "–"] for a in actions]
 
 
 def package_markdown(view: PackageView, max_hosts: int = DEFAULT_MAX_HOSTS, max_actions: int = DEFAULT_MAX_ACTIONS,
@@ -120,12 +155,13 @@ def package_markdown(view: PackageView, max_hosts: int = DEFAULT_MAX_HOSTS, max_
     sev = ", ".join(f"{k} {v}" for k, v in sorted(imp.by_severity.items(), key=lambda kv: kv[0])) or "none"
     lines = [
         f"# Fix: {md_text(p.title)}", "",
-        (f"Package `{md_text(p.package_id)}` · priority #{view.rank} (score {view.score.total:.1f}/100) · "
+        (f"Package {md_code(p.package_id)} · priority #{view.rank} (score {view.score.total:.1f}/100) · "
          f"data as of {view.as_of.date()}"), "",
         "**Why it ranks here:** " + "; ".join(md_text(r) for r in view.priority_reasons) + ".", "",
         "## What to do", "",
         md_text(SCOPE_NOTE), "",
-        *_table(["Action (Tenable solution)", "Vulnerabilities", "Hosts", "Worst severity", "Clears this share of fleet criticals"],
+        *_table(["Action (Tenable solution)", "Vulnerabilities", "Hosts", "Worst severity",
+                 "Fleet criticals this action alone clears"],
                 _action_rows(p.actions[:max_actions]), frozenset({1, 2, 4})),
     ]
     if len(p.actions) > max_actions:
@@ -139,12 +175,12 @@ def package_markdown(view: PackageView, max_hosts: int = DEFAULT_MAX_HOSTS, max_
          f"malware, {imp.kev_findings} on the CISA KEV list"),
         f"- Contains {_pct(imp.critical_share)} of the fleet's critical findings",
         "", "## Affected hosts", "", *_host_section(p.hosts, max_hosts),
-        "", "## References", "", "CVEs:", *_capped_list(p.cves, max_refs), "", "Advisories:",
-        *_capped_list(p.advisories, max_refs),
+        "", "## References", "", "CVEs:", *_capped_list(p.cves, max_refs), "", "Advisories (shown as text, not links):",
+        *_capped_list(p.advisories, max_refs, code=True),
         "", "## Cases this relieves", "",
     ]
-    lines += [f"- `{md_text(c.other_id)}` {md_text(c.title)}: {plural(c.findings, 'finding')} ({_pct(c.share)} of this package)"
-              for c in view.cases[:max_cases]] or ["- none"]
+    lines += [f"- {md_code(c.other_id)} {md_text(c.title)}: {plural(c.findings, 'finding')} "
+              f"({_pct(c.share)} of this package)" for c in view.cases[:max_cases]] or ["- none"]
     if len(view.cases) > max_cases:
         lines.append(f"- plus {len(view.cases) - max_cases} more cases in the JSON")
     lines += [
@@ -156,11 +192,17 @@ def package_markdown(view: PackageView, max_hosts: int = DEFAULT_MAX_HOSTS, max_
     return "\n".join(lines)
 
 
+_HOST_HEADER = ["asset_uuid", "hostname", "ipv4", "operating_system", "findings", "plugins", "worst_severity",
+                "oldest_first_found"]
+
+
+def _host_csv_rows(hosts: Iterable[HostLine]) -> list[list[object]]:
+    return [[h.asset_uuid, h.hostname, h.ipv4, h.operating_system, h.findings, h.plugins, h.worst_severity,
+             h.oldest_first_found.isoformat()] for h in hosts]
+
+
 def package_hosts_csv(view: PackageView) -> str:
-    header = ["asset_uuid", "hostname", "ipv4", "operating_system", "findings", "plugins", "worst_severity",
-              "oldest_first_found"]
-    return _csv(header, ([h.asset_uuid, h.hostname, h.ipv4, h.operating_system, h.findings, h.plugins,
-                          h.worst_severity, h.oldest_first_found.isoformat()] for h in view.package.hosts))
+    return _csv(_HOST_HEADER, _host_csv_rows(view.package.hosts))
 
 
 def package_actions_csv(view: PackageView) -> str:
@@ -179,14 +221,14 @@ def case_markdown(cf: CaseFile, max_hosts: int = DEFAULT_MAX_HOSTS, max_vulns: i
                   max_events: int = DEFAULT_MAX_EVENTS) -> str:
     lines = [
         f"# Case: {md_text(cf.title)}", "",
-        (f"Case `{md_text(cf.case_id)}` · {md_text(cf.kind)} · rank #{cf.rank} (score {cf.score.total:.1f}/100) · "
+        (f"Case {md_code(cf.case_id)} · {md_text(cf.kind)} · rank #{cf.rank} (score {cf.score.total:.1f}/100) · "
          f"data as of {cf.as_of.date()}"), "",
         "## Summary", "", *[f"- {md_text(line)}" for line in cf.facts_summary],
         "", "## Score breakdown", "",
         *_table(["Component", "Points", "Max", "Why"],
                 [[c.name, f"{c.points:.1f}", c.weight, c.detail] for c in cf.score.components], frozenset({1, 2})),
-        "", "## Fix packages that clear this case", "",
-        *(_table(["Package", "Findings", "Share of this case"],
+        "", "## Fix packages that address this case", "",
+        *(_table(["Package", "Findings", "Share of this case addressed"],
                  [[f"{f.title} ({f.other_id})", f.findings, _pct(f.share)] for f in cf.fixes], frozenset({1, 2}))
           or ["None."]),
         "", "## Top vulnerabilities", "",
@@ -198,12 +240,13 @@ def case_markdown(cf: CaseFile, max_hosts: int = DEFAULT_MAX_HOSTS, max_vulns: i
     if len(cf.vulnerabilities) > max_vulns:
         lines += ["", f"Showing {max_vulns} of {len(cf.vulnerabilities)} vulnerabilities; the rest are in the JSON."]
     lines += ["", "## Affected hosts", "", *_host_section(cf.hosts, max_hosts, csv_hint=False), "", "## Timeline", ""]
-    events = cf.timeline[:max_events]
+    events = cf.timeline[-max_events:] if max_events else ()
     lines += _table(["Date", "Event", "Findings", "Hosts"],
                     [[e.date.isoformat(), EVENT_LABELS.get(e.kind, e.kind), e.count, e.hosts] for e in events],
                     frozenset({2, 3}))
-    if len(cf.timeline) > max_events:
-        lines += ["", f"Showing the first {max_events} of {len(cf.timeline)} dated events; the rest are in the JSON."]
+    if len(cf.timeline) > len(events):
+        earlier = len(cf.timeline) - len(events)
+        lines += ["", f"Showing the latest {len(events)} of {len(cf.timeline)} dated events; {earlier} earlier events are in the JSON."]
     lines += [
         "", "## Limitations", "", *[f"- {md_text(item)}" for item in cf.limitations],
         "", "## Source records", "",
@@ -216,10 +259,7 @@ def case_markdown(cf: CaseFile, max_hosts: int = DEFAULT_MAX_HOSTS, max_vulns: i
 
 
 def case_hosts_csv(cf: CaseFile) -> str:
-    header = ["asset_uuid", "hostname", "ipv4", "operating_system", "findings", "plugins", "worst_severity",
-              "oldest_first_found"]
-    return _csv(header, ([h.asset_uuid, h.hostname, h.ipv4, h.operating_system, h.findings, h.plugins,
-                          h.worst_severity, h.oldest_first_found.isoformat()] for h in cf.hosts))
+    return _csv(_HOST_HEADER, _host_csv_rows(cf.hosts))
 
 
 def case_json(cf: CaseFile) -> str:
@@ -228,25 +268,49 @@ def case_json(cf: CaseFile) -> str:
 
 # --- writing ---
 
+def _safe_stem(identifier: str, fallback: str) -> str:
+    """Readable, bounded, collision-proof file stem: slug plus a short hash of the exact id."""
+    slug = slugify(identifier)[:MAX_STEM_CHARS].strip("-") or fallback
+    digest = hashlib.sha1(identifier.encode("utf-8", "replace"), usedforsecurity=False).hexdigest()[:8]
+    return f"{slug}-{digest}"
+
+
 def _write_all(files: dict[str, str], out_dir: Path, confirm: bool) -> tuple[Path, ...]:
+    """Write every file via a temp file and ``os.replace`` (which replaces a symlink rather than following it)."""
     if confirm is not True:
         raise ExportError("writing export files requires confirm=true")
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    root = out_dir.resolve()
-    written = []
+    try:
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        root = out_dir.resolve()
+    except OSError as exc:
+        raise ExportError(f"cannot use the export directory: {type(exc).__name__}") from None
+    plan = []
     for name, content in files.items():
-        target = (root / name).resolve()
-        if target.parent != root:
+        if Path(name).name != name or not name:
             raise ExportError(f"refusing to write outside the export directory: {name}")
-        with open(target, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(content)
-        written.append(target)
-    return tuple(written)
+        final = root / name
+        if final.is_dir():
+            raise ExportError(f"a directory already exists at {name}")
+        plan.append((root / f".{name}.tmp", final, content, "utf-8-sig" if name.endswith(".csv") else "utf-8"))
+    temps = [tmp for tmp, *_ in plan]
+    try:
+        for tmp, _, content, encoding in plan:
+            tmp.unlink(missing_ok=True)
+            with open(tmp, "x", encoding=encoding, newline="\n") as handle:
+                handle.write(content)
+        for tmp, final, _, _ in plan:
+            os.replace(tmp, final)
+    except OSError as exc:
+        raise ExportError(f"export failed: {type(exc).__name__}") from None
+    finally:
+        for tmp in temps:
+            tmp.unlink(missing_ok=True)
+    return tuple(final for _, final, _, _ in plan)
 
 
 def write_package_export(view: PackageView, out_dir: Path, confirm: bool = False) -> tuple[Path, ...]:
-    stem = slugify(view.package.package_id) or "package"
+    stem = _safe_stem(view.package.package_id, "package")
     return _write_all({
         f"{stem}.md": package_markdown(view), f"{stem}.json": package_json(view),
         f"{stem}-hosts.csv": package_hosts_csv(view), f"{stem}-actions.csv": package_actions_csv(view),
@@ -254,7 +318,7 @@ def write_package_export(view: PackageView, out_dir: Path, confirm: bool = False
 
 
 def write_case_export(cf: CaseFile, out_dir: Path, confirm: bool = False) -> tuple[Path, ...]:
-    stem = slugify(cf.case_id) or "case"
+    stem = _safe_stem(cf.case_id, "case")
     return _write_all({
         f"{stem}.md": case_markdown(cf), f"{stem}.json": case_json(cf), f"{stem}-hosts.csv": case_hosts_csv(cf),
     }, out_dir, confirm)

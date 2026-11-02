@@ -70,7 +70,8 @@ def vulnerability_lines(members: list[FindingRecord]) -> tuple[VulnLine, ...]:
         vprs = [r.vpr_score for r in rs if r.vpr_score is not None]
         lines.append(VulnLine(
             plugin_id=plugin_id, name=rep.plugin_name, severity=min((r.severity for r in rs), key=SEVERITY_ORDER.index),
-            hosts=len({r.asset_uuid for r in rs}), findings=len(rs), cves=rep.cves[:MAX_CVES_PER_VULN],
+            hosts=len({r.asset_uuid for r in rs}), findings=len(rs),
+            cves=tuple(sorted({c for r in rs for c in r.cves}))[:MAX_CVES_PER_VULN],
             on_cisa_kev=any(r.on_cisa_kev for r in rs), vpr_score=max(vprs) if vprs else None,
             exploit_available=any(r.exploit_available for r in rs), fix_type=classify_fix(rep.solution),
             solution=" ".join(rep.solution.split()),
@@ -108,7 +109,9 @@ def facts_summary(facts: dict, as_of: datetime) -> tuple[str, ...]:
                       ("reopened_findings", "reopened after being fixed")):
         if facts[key]:
             lines.append(f"{_plural(facts[key], 'finding')} {text}.")
-    lines.append(f"The oldest finding was first seen {facts['age_days']} days before the data snapshot ({as_of.date()}).")
+    lines.append(
+        f"The oldest finding was first seen {_plural(facts['age_days'], 'day')} before the data snapshot ({as_of.date()})."
+    )
     return tuple(lines)
 
 
@@ -142,6 +145,8 @@ class CaseFile:
 
 
 def build_case_file(ranked: RankedCluster, links: Links, as_of: datetime) -> CaseFile:
+    if as_of.tzinfo is None:
+        raise ValueError("as_of must be timezone-aware (finding dates are UTC)")
     case = ranked.cluster
     members = list(case.active)
     facts = case_facts(members, as_of)

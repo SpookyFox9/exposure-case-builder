@@ -170,7 +170,7 @@ def test_package_json_round_trips_and_is_deterministic(world):
 
 # --- analyst case file ---
 
-CASE_SECTIONS = ["# Case:", "## Summary", "## Score breakdown", "## Fix packages that clear this case",
+CASE_SECTIONS = ["# Case:", "## Summary", "## Score breakdown", "## Fix packages that address this case",
                  "## Top vulnerabilities", "## Affected hosts", "## Timeline", "## Limitations",
                  "## Source records", "## Disposition"]
 
@@ -205,7 +205,9 @@ def test_write_requires_confirm(world, tmp_path):
 def test_write_package_export_creates_three_files_with_safe_names(world, tmp_path):
     paths = write_package_export(package_view(world), tmp_path / "exports", confirm=True)
     names = {p.name for p in paths}
-    assert names == {"fix-v-p-patch.md", "fix-v-p-patch.json", "fix-v-p-patch-hosts.csv", "fix-v-p-patch-actions.csv"}
+    stem = next(iter(names)).split(".")[0].replace("-hosts", "").replace("-actions", "")
+    assert re.fullmatch(r"fix-v-p-patch-[0-9a-f]{8}", stem)
+    assert names == {f"{stem}.md", f"{stem}.json", f"{stem}-hosts.csv", f"{stem}-actions.csv"}
     assert all(p.parent == (tmp_path / "exports") for p in paths)
     assert all(p.read_text(encoding="utf-8") for p in paths)
 

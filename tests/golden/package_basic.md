@@ -8,7 +8,7 @@ Package `fix:v-p:patch` · priority #1 (score 81.1/100) · data as of 2026-11-02
 
 Fix text is Tenable-provided. Tenable's data does not state that one update supersedes another, so each action is listed separately, and the totals are contained in the package, not cleared by a single action.
 
-| Action (Tenable solution) | Vulnerabilities | Hosts | Worst severity | Clears this share of fleet criticals |
+| Action (Tenable solution) | Vulnerabilities | Hosts | Worst severity | Fleet criticals this action alone clears |
 | --- | ---: | ---: | --- | ---: |
 | Upgrade to widget 2.0 or later. | 1 | 2 | critical | 100.0% |
 | Upgrade to widget 2.1. | 1 | 1 | medium | – |
@@ -32,12 +32,12 @@ Fix text is Tenable-provided. Tenable's data does not state that one update supe
 CVEs:
 - CVE-2023-1
 
-Advisories:
-- https://example.test/adv1
+Advisories (shown as text, not links):
+- `https://example.test/adv1`
 
 ## Cases this relieves
 
-- `plugin:1` Plugin 1: 2 findings (66.7% of this package)
+- `plugin:1` Plugin 1: 2 findings (66.6% of this package)
 - `plugin:2` Plugin 2: 1 finding (33.3% of this package)
 
 ## Source records

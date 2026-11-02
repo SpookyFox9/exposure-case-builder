@@ -21,6 +21,7 @@ from typing import Any
 from .schema import Evidence
 
 VALID_STATES = frozenset({"OPEN", "REOPENED", "FIXED"})
+VALID_SEVERITIES = frozenset({"info", "low", "medium", "high", "critical"})
 MAX_FILE_BYTES = 256 * 1024 * 1024  # largest export chunk seen is about 36 MB
 MAX_TEXT_CHARS = 4096  # per free-text field (solution, plugin output is allowed twice this)
 MAX_LIST_ITEMS = 100  # per list field (CVEs, advisory links, CPEs)
@@ -201,6 +202,9 @@ def parse_record(raw: Any) -> FindingRecord:
     state = _required_str(raw, "state", "record").upper()
     if state not in VALID_STATES:
         raise IngestError(f"unknown state: {state!r}")
+    severity = _required_str(raw, "severity", "record").lower()
+    if severity not in VALID_SEVERITIES:
+        raise IngestError(f"unknown severity: {severity!r}")
     plugin_id = _opt_int(plugin.get("id"))
     if plugin_id is None:
         raise IngestError("missing required field: plugin.id")
@@ -215,7 +219,7 @@ def parse_record(raw: Any) -> FindingRecord:
         plugin_name=_text(plugin.get("name")),
         plugin_family=_text(plugin.get("family")),
         synopsis=_text(plugin.get("synopsis")),
-        severity=_required_str(raw, "severity", "record").lower(),
+        severity=severity,
         state=state,
         first_found=_parse_ts(raw.get("first_found"), "first_found"),
         last_found=_parse_ts(raw.get("last_found"), "last_found"),
