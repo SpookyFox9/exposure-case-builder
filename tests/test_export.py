@@ -106,7 +106,12 @@ def test_md_cell_escapes_pipes_and_backticks():
     assert "|" not in out.replace("\\|", "") and "`" not in out
 
 
-@pytest.mark.parametrize("bad", ["=cmd|' /C calc'!A0", "+1+1", "-2+3", "@SUM(A1)", "\t=1", "\r=1"])
+# Assembled from parts: antivirus products flag a complete Excel-DDE launcher string wherever it sits on disk
+# (see tests/test_hygiene.py). It is inert test data for csv_cell.
+DDE_LAUNCHER = "=" + "cm" + "d|' /C " + "ca" + "lc'!A0"
+
+
+@pytest.mark.parametrize("bad", [DDE_LAUNCHER, "+1+1", "-2+3", "@SUM(A1)", "\t=1", "\r=1"])
 def test_csv_cell_neutralizes_formulas(bad):
     assert csv_cell(bad).startswith("'")
 

@@ -51,6 +51,8 @@ The user's written rules are copied, unmodified, into `.claude/rules/` (`common/
 
 **Coding style (from the rules).** Immutability: create new objects, never mutate existing ones. Dataclasses are `frozen=True` (the checker enforces it); service responses are built as new dictionaries. The one documented exception is `Workspace`'s internal memoization caches (derived, rebuildable, never exposed). Small files (typical 200-400 lines, 800 maximum) and functions (under 50 lines); no nesting deeper than 4; type annotations on every signature; handle errors explicitly at every level and never swallow them; validate every external input at the boundary; no hardcoded values; `logging`, not `print`.
 
+**Attack payloads in tests** (CSV/DDE, XSS, bidi) are inert inputs to our escaping code, but antivirus products match on the text: BitDefender quarantined pytest's `lastfailed` cache as `Generic.DDE.Exploit` because test IDs embed parameter text. So the Excel-DDE launcher is assembled from parts (never one literal on disk), `tests/conftest.py` gives hostile parameters neutral IDs (`hostile-<hash>`), and `tests/test_hygiene.py` fails if a complete launcher appears in any project file or any test ID. Keep new payloads out of IDs the same way.
+
 **Deviations** from a rule are recorded, with the reason, in `docs/ENGINEERING_AUDIT.md`.
 
 ## Hard rules

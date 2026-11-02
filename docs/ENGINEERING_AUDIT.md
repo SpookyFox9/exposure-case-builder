@@ -54,3 +54,11 @@ Earlier, narrower reviews (`python-reviewer`) covered the fetch script and inges
 - **`service.py` is 431 lines** (warning, limit 800). Splitting the queue/row builders into their own module is a reasonable next step.
 - **Cross-test imports** between test modules remain.
 - **The live Claude Code session** has not been run, so narrative quality is untested beyond the contract tests.
+
+## Incident: antivirus false positive on a pytest cache file (2026-11-02)
+
+BitDefender quarantined `.pytest_cache/v/cache/lastfailed` as `Generic.DDE.Exploit.E.AB102BE5`. pytest records the IDs of failing tests in that file, and a parametrized ID embeds the parameter text; our CSV test feeds the textbook Excel-DDE launcher to `csv_cell` to prove it is neutralized, so a short file dominated by that string matched the signature. Nothing ran the string and no code path could: it is data passed to an escaping function.
+
+Cause on our side: the payload appeared in test IDs and, as a literal, in `tests/test_export.py`. Fixed test-first: the launcher is assembled from parts; `tests/conftest.py` (`pytest_make_parametrize_id`) gives every hostile parameter a neutral `hostile-<hash>` ID; `tests/test_hygiene.py` fails if a complete launcher is on disk anywhere in the project or in any test ID. Verified by forcing a failing test with hostile parameters: pytest now records only neutral IDs.
+
+Left on the machine, not in the code: the exact path `.pytest_cache\v\cache\lastfailed` is still refused for writes (any other name in that folder works), which points at the antivirus's quarantine entry. Clearing that entry in the antivirus is the fix. The refusal only produces a harmless pytest warning; the tests pass. Other payload strings remain in test sources (for example the script-tag and `javascript:` XSS cases); they were not flagged, and none appears in a test ID.
