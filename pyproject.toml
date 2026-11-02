@@ -13,7 +13,16 @@ dependencies = ["mcp==2.3.0"]
 exposure-case-server = "exposure_case.server:main"
 
 [dependency-groups]
-dev = ["pytest==9.2.0"]
+# Dev-only quality gates required by the engineering standards (see CLAUDE.md).
+# Each is a well-known, MIT/Apache/BSD-licensed tool, pinned so the checks run offline from uv.lock.
+dev = [
+    "pytest==9.2.0",      # test runner
+    "coverage==7.16.2",   # coverage gate (80% minimum)
+    "ruff==0.17.3",       # lint, import sorting, complexity, print() ban
+    "black==26.10.1",     # formatter
+    "mypy==2.4.1",        # type checking
+    "bandit==1.9.4",      # static security analysis
+]
 
 [build-system]
 requires = ["hatchling==1.33.0"]
@@ -25,3 +34,52 @@ packages = ["src/exposure_case"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "unit: fast, isolated tests of one module",
+    "integration: tests that cross module boundaries or start the real MCP server",
+    "e2e: whole-flow tests from fetch to disposition",
+]
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",            # pycodestyle, pyflakes
+    "I",                      # import sorting (isort)
+    "B", "C4", "SIM", "UP",   # bugbear, comprehensions, simplify, pyupgrade
+    "C90", "PLR0912", "PLR0915",  # complexity: McCabe, branches, statements (function size)
+    "PLE", "PLW", "RUF", "FURB", "ISC",
+    "T20",                    # no print(); use logging
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR0915"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src", "scripts"]
+ignore_missing_imports = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[tool.coverage.run]
+source = ["src/exposure_case", "scripts"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_empty = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
