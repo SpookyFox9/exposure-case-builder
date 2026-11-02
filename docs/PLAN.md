@@ -132,9 +132,9 @@ All read-only except `record_disposition`. The dataset path comes from `INSIDER_
 **Mon Nov 2 evening**
 1. [x] Repo, MIT license, `.gitignore`, `.gitattributes`, gitleaks pre-commit hook
 2. [x] `mcp==2.3.0` stdio smoke test, SDK client only
-3. [ ] Smoke test from Claude Code itself (needs the user to run the `claude mcp add` command below)
-4. [ ] Schema dataclasses and synthetic generator (test-first)
-5. [ ] README skeleton
+3. [ ] Smoke test from Claude Code itself. `insider-smoke` is registered (user ran `claude mcp add`); still need to reload MCP, confirm in `/mcp`, and call `ping`
+4. [x] Schema dataclasses and synthetic generator (test-first)
+5. [x] README skeleton
 6. [ ] Start the CERT download in the background, only after the license check
 
 **Tue Nov 3 (end-to-end demo by end of day)**
@@ -170,9 +170,14 @@ All read-only except `record_disposition`. The dataset path comes from `INSIDER_
 
 Last updated: 2026-11-02, Monday evening.
 
-- Done: repo scaffold and secret-scan hook (8 staged files scanned clean; no commit yet); `mcp==2.3.0` SDK-to-SDK stdio smoke test; pins checked against PyPI (`pytest==9.2.0`, `hatchling==1.33.0`).
-- **No commits yet.** Make the first commit only when the user asks, and watch the pre-commit hook run on it.
-- Not started: synthetic generator, detectors, MCP server, skill, playbook, README body.
+- Done: repo scaffold, MIT license, gitleaks pre-commit hook (ran clean on the first commit); `mcp==2.3.0` SDK-to-SDK stdio smoke test; pins checked against PyPI (`pytest==9.2.0`, `hatchling==1.33.0`).
+- Done: `schema.py` (frozen `Evidence`, `Event`, `Finding`; a Finding needs non-empty evidence and a finite score) and the seeded synthetic generator (`synthetic.py`, `scripts/make_synthetic.py`). 50 users, 6 planted insiders across 3 scenarios (`job_site_exfil`, `usb_file_copy`, `email_exfil`), 2 decoys. The answer key is in `data/synthetic/_labels/answers.csv`, kept apart from the source files; ingest must never read `_labels/`.
+- Done: README skeleton with the Exchange-required sections (several marked TODO). 18 tests pass. python-reviewer found no CRITICAL or HIGH issues; MEDIUM fixes applied.
+- Committed: `d02777b` on `main` (not pushed). `scripts/mcp_smoke.py` is deliberately untracked until the smoke test is done.
+- In progress: Claude Code smoke test. `insider-smoke` is registered in local config. Next: reload MCP or restart and `/resume`, check `/mcp`, ask Claude to call `ping`. On success, delete `scripts/mcp_smoke.py` and run `claude mcp remove insider-smoke`; on failure, pin `mcp==1.30.0`.
+- Not started: CERT license check and download (step 6), detectors, baselines, case assembly, MCP server, skill, playbook, README body.
+- Deferred review items: split `generate()` and group `_baseline_day` parameters into a config object; add a golden-hash determinism test; consider trimming the 2.5 MB committed sample.
+- Generator facts for detector tests: timestamps are ISO (`YYYY-MM-DD HH:MM:SS`), not CERT's `MM/DD/YYYY`, so the real-CERT normalizer is still to write. Insider activity falls in the last 20 workdays. Benign decoys: `U0001` (late-night release engineer), `U0003` (frequent external attachments). Two benign non-insiders also have a roster `end_date`.
 
 ## Resuming in a new session
 
