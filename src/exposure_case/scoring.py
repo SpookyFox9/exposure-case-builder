@@ -122,10 +122,14 @@ def _breadth(c: Cluster, fleet: int) -> ScoreComponent:
     return ScoreComponent("breadth", 15, min(1.0, math.log1p(n) / denominator), f"{n} of {max(fleet, n)} hosts affected")
 
 
+def _finding(n: int) -> str:
+    return f"{n} finding" if n == 1 else f"{n} findings"
+
+
 def _volume(c: Cluster) -> ScoreComponent:
     n = len(c.plugin_ids)
     raw = min(1.0, math.log1p(n) / math.log1p(VOLUME_SATURATION))
-    return ScoreComponent("volume", 10, raw, f"{n} distinct vulnerabilities, {len(c.active)} findings")
+    return ScoreComponent("volume", 10, raw, f"{n} distinct {'vulnerability' if n == 1 else 'vulnerabilities'}, {_finding(len(c.active))}")
 
 
 def _age(c: Cluster, as_of: datetime) -> ScoreComponent:
@@ -135,17 +139,17 @@ def _age(c: Cluster, as_of: datetime) -> ScoreComponent:
 
 def _unsupported(c: Cluster) -> ScoreComponent:
     n = sum(r.unsupported_by_vendor for r in c.active)
-    return ScoreComponent("unsupported", 5, 1.0 if n else 0.0, f"{n} findings on vendor-unsupported software")
+    return ScoreComponent("unsupported", 5, 1.0 if n else 0.0, f"{_finding(n)} on vendor-unsupported software")
 
 
 def _recurrence(c: Cluster) -> ScoreComponent:
     n = sum(r.state == "REOPENED" for r in c.active)
-    return ScoreComponent("recurrence", 5, min(1.0, n / RECURRENCE_SATURATION), f"{n} findings reopened after a fix")
+    return ScoreComponent("recurrence", 5, min(1.0, n / RECURRENCE_SATURATION), f"{_finding(n)} reopened after a fix")
 
 
 def _patch(c: Cluster) -> ScoreComponent:
     n = sum(r.has_patch for r in c.active)
-    return ScoreComponent("patch", 5, 1.0 if n else 0.0, f"{n} findings have a vendor patch available")
+    return ScoreComponent("patch", 5, 1.0 if n else 0.0, f"{_finding(n)} with a vendor patch available")
 
 
 def score_cluster(cluster: Cluster, fleet: int, as_of: datetime) -> Score:

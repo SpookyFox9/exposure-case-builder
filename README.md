@@ -25,7 +25,12 @@ _TODO:_ fetch script, sample-data quickstart, MCP configuration for Claude Code.
 
 ## Outputs
 
-_TODO:_ cluster list, case-file and export formats; the disposition log.
+Two views of the same findings, linked both ways (every active finding is in exactly one case and exactly one fix package):
+
+- **Case file (security team).** Rank and score with a per-component breakdown, summary facts, the fix packages that clear it, top vulnerabilities with CVEs, affected hosts, a timeline, limitations, and an empty disposition slot. Exports: `<case>.md`, `<case>.json`, `<case>-hosts.csv`.
+- **Fix package (engineers).** What to do (Tenable's own solution text, one row per distinct action with what each clears), the impact contained in the package, affected hosts, CVEs and advisory links, and the cases it relieves. Exports: `<package>.md` for tickets (hosts and actions capped, with a pointer to the full lists), `<package>.json` (complete), `<package>-hosts.csv` and `<package>-actions.csv` (complete).
+
+Exports are deterministic (no wall-clock time) and written only on request with `confirm=true`, to a fixed directory. Tenable-supplied text is neutralized: spreadsheet formulas in CSV cells are prefixed with an apostrophe and Markdown/HTML markup is escaped. The disposition log is added with the MCP server.
 
 ## Known limitations
 

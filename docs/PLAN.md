@@ -163,8 +163,10 @@ Review of the fix view (python-reviewer, 2026-11-02) fixed: overflow on huge JSO
 Fix-type rule (documented in `fixes.py`): the solution's opening verb decides. update/upgrade/apply/install/"Microsoft has released" = `patch`; "Contact the vendor ... for an update/patch" = `patch` unless it also says disable/configure/remove etc.; everything else = `configuration`; empty = `unspecified`. `has_patch` is NOT used (true for 98% of plugins) and `has_workaround` is always false in this tenant.
 
 **Phase 4: case and export**
-1. [ ] Case assembly
-2. [ ] Markdown, CSV, JSON exporters with golden-file tests
+1. [x] `case.py`: `CaseFile` (analyst) and `PackageView` (engineer), deterministic, JSON-ready
+2. [x] `export.py`: Markdown, CSV, JSON for both views; `write_*_export` needs `confirm=true`, never leaves the output directory; golden-file tests
+3. [x] Untrusted-text handling: CSV formula neutralization, Markdown/HTML escaping (backslash escapes so raw text stays readable), size caps with pointers to the complete JSON/CSV
+4. [x] Real-data check: all 200 packages and 815 cases render in 0.3 s; largest Markdown 12 KB, largest JSON 876 KB; no formula-capable CSV cells and no raw angle brackets
 
 **Phase 5: MCP, skill, playbook**
 1. [ ] MCP server with five tools and contract tests
@@ -202,7 +204,8 @@ Last updated: 2026-11-02, Monday evening.
 - Done (Phase 2): `ingest.py`, `scripts/fetch_tenable.py`, `scripts/make_sample.py`, `data/sample/` (1.3 MB, gitleaks clean). 139 tests pass. The full export lives in `data/raw/full1` (gitignored, about 108 MB). Committed as `094e311`.
 - Done (Phase 3b): ingest fix fields, `fixes.py`, `links.py`, KEV/VPR in scoring, real fix dates in the timeline; 259 tests, ruff and mypy clean.
 - Done (Phase 3): `cluster.py`, `scoring.py`, `timeline.py`, `reconcile.py`; 139 tests pass; ruff and mypy clean. 815 cases from the full export (15 patch families, 800 plugins). Weights approved.
-- Next: Phase 4 (case file and exports for analysts and for engineers), then Phase 5 (MCP server with a `kind` filter on the queue, skill, playbook).
+- Done (Phase 4): case file and package view with Markdown/CSV/JSON exports; 303 tests, ruff and mypy clean.
+- Next: Phase 5 (MCP server with a `kind` filter on the queue, skill, playbook).
 
 ## Resuming in a new session
 

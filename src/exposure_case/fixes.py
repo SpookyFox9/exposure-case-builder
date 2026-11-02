@@ -224,7 +224,7 @@ def _actions(members: list[FindingRecord], fleet_critical: int) -> tuple[FixActi
     return tuple(sorted(actions, key=lambda a: (-a.plugins, -a.findings, a.solution)))
 
 
-def _hosts(members: list[FindingRecord]) -> tuple[HostLine, ...]:
+def host_lines(members: list[FindingRecord]) -> tuple[HostLine, ...]:
     per_host: dict[str, list[FindingRecord]] = defaultdict(list)
     for r in members:
         per_host[r.asset_uuid].append(r)
@@ -275,7 +275,7 @@ def build_fix_packages(records: Iterable[FindingRecord]) -> tuple[FixPackage, ..
             package_id=ids[key], product=product, fix_type=fix_type, title=f"{label} ({fix_type})",
             plugin_ids=plugin_ids, active=tuple(members),
             fixed_findings=sum(r.state == "FIXED" for r in groups[key]),
-            actions=actions, hosts=_hosts(members), impact=_impact(members, fleet_critical, len(actions)),
+            actions=actions, hosts=host_lines(members), impact=_impact(members, fleet_critical, len(actions)),
             cves=tuple(sorted({c for r in members for c in r.cves})),
             advisories=tuple(sorted({u for r in members for u in r.see_also})),
         ))
