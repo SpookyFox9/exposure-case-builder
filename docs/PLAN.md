@@ -19,10 +19,11 @@ Three components with a fixed division of labor:
 | Decision | Choice | Why |
 |---|---|---|
 | Domain | Vulnerability exposure, not insider threat | Tenant data fits; no equivalent on the Exchange; user judged insider threat added needless complication |
-| Case unit | Finding cluster keyed by `plugin.id` | A human acts on one fix across many assets, not 50 per-asset cases |
-| Optional rollup | Group clusters by `plugin.family`/`cpe` product | Stretch goal |
-| Score | Transparent weighted sum, breakdown shown, weights in one table | Explainable, no ML |
-| Context fields | Optionally join VPR and CVSS from `/workbenches/vulnerabilities` by `plugin_id` | The export has neither; the workbench list is capped at 5,000 rows, so coverage is partial and the score must not depend on it |
+| Case unit (risk layer) | **Hybrid (decided 2026-11-02):** patch-type families (`* Local Security Checks`, `Windows : Microsoft Bulletins`) are ONE case per family; every other plugin, CISCO included (user decision), is one case per `plugin.id` | Plain per-plugin clustering gave 7,148 cases whose top 20 were near-duplicate Windows KB plugins. Hybrid gives 815 cases (15 families + 800 plugins) |
+| Fix packages (engineer layer) | **Decided 2026-11-02:** a second, downstream view organized around the fix: key = normalized product (CPE) + fix type, falling back to the plugin. Each finding is in exactly one case and exactly one fix package; each links to the other | The security team needs risk-centred cases; the people who fix things need "what do I do and what does it clear". Cisco advisories roll up by product here (IOS, NX-OS) |
+| Known gap | Near-duplicate plugin cases remain (e.g. Oracle Java April/July/January CPU on the same 2 hosts; two Flash advisories on one host) | A product-level rollup is a possible later step; not in v0.1 |
+| Score | Transparent weighted sum, breakdown shown, weights in one table. User approved the weights 2026-11-02; KEV/VPR to be folded into the exploit component without changing weights | Explainable, no ML |
+| Context fields | VPR, EPSS, CISA KEV, `solution`, `see_also`, CVEs, CPE come from the export itself | 93-99% coverage; no extra fetch needed |
 | Team grouping | Affected assets grouped by OS, device type, /24 subnet | Tenant has no tags and only 2 groups |
 | Export | Markdown handoff + CSV of affected assets + JSON bundle; text by default, file write needs `confirm=true` to a fixed directory | Shareable with other teams |
 | Disposition | `record_disposition` per cluster: `assigned`, `risk-accepted`, `false-positive`, `needs-info`, plus a note | Append-only local JSONL, `confirm=true` |
@@ -39,9 +40,9 @@ Three components with a fixed division of labor:
 - `/audit-log/v1/events`: HTTP 403 with the current read-only keys.
 - `/workbenches/vulnerabilities`: 5000 plugin-level rows (possibly a cap, unverified) with `count`, `severity`, `vpr_score`, `cvss_base_score`, `cvss3_base_score`, `plugin_family`, `plugin_id`, `plugin_name`, `vulnerability_state`.
 - `POST /vulns/export` (states open/reopened/fixed): `num_assets` is the **assets per chunk**, not a limit. The default fleet export returns 4 chunks. Full export (fetched 2026-11-02, 30 s, about 108 MB on disk): **19,437 findings, 160 assets, 7,714 plugins (7,148 clusters with non-info, non-fixed findings), 18 scans**. States: 18,448 OPEN, 604 REOPENED, 385 FIXED. Severity: 9,071 info, 4,391 medium, 3,856 high, 1,354 critical, 765 low. 3,531 have `exploit_available`, 753 `exploited_by_malware`, 192 `in_the_news`, 50 `unsupported_by_vendor`, 0 `checks_for_default_account`. `first_found` spans 2026-05-18 to 2026-11-02. There are no duplicate (asset, plugin, port, protocol) rows.
-- Record keys: `finding_id`, `state`, `severity`, `first_found`, `last_found`, `asset{uuid,hostname,ipv4,operating_system,device_type,...}`, `plugin{id,name,family,synopsis,description,exploit_available,exploited_by_malware,in_the_news,has_patch,unsupported_by_vendor,checks_for_default_account,exploit_framework_*,xrefs,cpe,...}`, `port{port,protocol,service}`, `scan{uuid,started_at,schedule_uuid,target}`, `output`, `source`. No `vpr`, `cvss` or `solution` field in the export's plugin object.
-- **The workbench plugin list is capped at exactly 5,000 rows**, so 3,000 of the 7,677 clusters with non-fixed findings have no workbench row. VPR is present for only 4,049 of 7,677 clusters. **The score therefore cannot depend on VPR**; VPR/CVSS are optional context shown when available.
-- **Reconciliation** (distinct non-fixed assets per plugin vs workbench `count`): 4,622 of 4,677 comparable clusters match exactly; 55 do not (about 1.2%), and all 55 have the export below the workbench count (by 1 to 31). The workbench saw 164 assets with vulns, the export has 160. The cause is unverified (not just those 4 assets, since one gap is 31). Treat reconciliation as a reported tolerance, not a hard assertion.
+- Record keys: `finding_id`, `state`, `severity`, `first_found`, `last_found`, `asset{uuid,hostname,ipv4,operating_system,device_type,...}`, `plugin{id,name,family,synopsis,description,exploit_available,exploited_by_malware,in_the_news,has_patch,unsupported_by_vendor,checks_for_default_account,exploit_framework_*,xrefs,cpe,...}`, `port{port,protocol,service}`, `scan{uuid,started_at,schedule_uuid,target}`, `output`, `source`. **Correction (2026-11-02):** an earlier version of this plan said the export has no `vpr`, `cvss` or `solution`. That was wrong: Tenable omits empty fields per record, so one record's keys misled. Across all 19,437 records the plugin object also has `solution`, `see_also`, `cve`, `vpr` (object with `on_cisa_kev`, `exploit_code_maturity`, drivers), `epss_score`, `cvss*`, `ms_bulletin`, `usn`, `patch_publication_date`, `vendor_unpatched`, `has_workaround`; finding records have `last_fixed`, `resurfaced_date`, `time_taken_to_fix` (only 196 findings). Coverage over 7,173 non-info plugins: solution 99%, see_also 99%, cpe 99%, vpr 93%, epss 93%, cve 93%, cvss3 89%. 3,754 distinct solution texts; "Update the affected packages." alone is on 1,781 plugins, so solution text cannot be the grouping key by itself.
+- **The workbench plugin list is capped at exactly 5,000 rows**, so 3,000 of the 7,677 clusters with non-fixed findings have no workbench row. That cap affects only `plugins.json` (used for reconciliation). VPR, EPSS and CISA KEV come from the export itself at 93% coverage, so they can feed the score (see "Scoring").
+- **Reconciliation** (non-fixed findings per plugin vs workbench `count`): of 4,677 comparable plugins, 4,622 match distinct hosts and 14 more match finding instances (one finding per host and port), so 4,636 (99.1%) match. The other 41 all have the export below the workbench count. The workbench saw 164 assets with vulns, the export has 160; the cause is unverified. Reconciliation is a reported tolerance (`reconcile.py`), not a hard assertion.
 - OS strings are highly varied (120 distinct first OS strings), so peer grouping needs normalization to an OS family. Device types: general-purpose 15,961, embedded 1,250, switch 551, unknown 428, firewall 422.
 - IPs, hostnames and similar fields are masked. Never OSINT them.
 - **Unverified:** where remediation text (`solution`) lives (not in the export), whether the workbench plugin list can be paged past 5,000 rows, the cause of the reconciliation gap, what the 4 assets missing from the export are.
@@ -64,9 +65,12 @@ insider-case-builder/               (directory name is a leftover; package is ex
 ├── src/exposure_case/
 │   ├── schema.py                   frozen dataclasses (Evidence, Finding)
 │   ├── ingest.py                   export reader (FindingRecord, PluginInfo)
-│   ├── cluster.py                  group findings by plugin
-│   ├── scoring.py                  weighted components + breakdown
-│   ├── case.py                     cluster case assembly and timeline
+│   ├── cluster.py                  hybrid case grouping (patch families + plugins)
+│   ├── scoring.py                  weighted components, breakdown, ranking
+│   ├── timeline.py                 per-case timeline from first/last found dates
+│   ├── reconcile.py                trust check against Tenable's plugin counts
+│   ├── fixes.py                    fix packages: product + fix type, impact, links to cases
+│   ├── case.py                     case assembly (Phase 4)
 │   ├── export.py                   Markdown / CSV / JSON handoff
 │   ├── disposition.py              append-only local JSONL log
 │   └── server.py                   MCP stdio server (thin wrapper)
@@ -81,9 +85,24 @@ insider-case-builder/               (directory name is a leftover; package is ex
 
 **README sections (Exchange requires):** Purpose, Prerequisites, How to run, Outputs, Known limitations, Data flows, Data sources and licensing. Tag a release (v0.1.0) and submit from the tag.
 
-## Scoring (initial design; weights to be fixed in Phase 3 and documented here)
+## Scoring (implemented in `scoring.py`; weights are the single source of truth)
 
-Components per cluster: max severity, `exploit_available`, `exploited_by_malware`, `in_the_news`, `has_patch` (patchable raises actionability), affected asset count, age (oldest `first_found`), reopened count, `unsupported_by_vendor`, `checks_for_default_account`, VPR (if joined). The case shows each component's value and contribution.
+Total = sum of component points (max 100). Every case returns the component breakdown. VPR/CVSS are not inputs (partial coverage).
+
+| Component | Weight | Raw value (0..1) |
+|---|---|---|
+| severity | 30 | worst active severity: critical 1.0, high 0.75, medium 0.4, low 0.1 |
+| exploit | 25 | exploited by malware 1.0, else exploit available 0.6, else 0; +0.2 if in the news (cap 1) |
+| breadth | 15 | log1p(hosts) / log1p(fleet hosts) |
+| volume | 10 | log1p(distinct plugins) / log1p(1000) |
+| age | 5 | days since the oldest active `first_found` / 180 (cap 1) |
+| unsupported | 5 | any finding on vendor-unsupported software |
+| recurrence | 5 | reopened findings / 5 (cap 1) |
+| patch | 5 | any finding with a vendor patch available |
+
+Ages are measured from the latest `last_found` in the data, never the wall clock, so ranking is deterministic. Ties break on cluster id.
+
+**Hand-check, full export (2026-11-02, after the CISCO split):** 815 cases rank in under a second. Top: Windows Microsoft Bulletins (14 hosts, 621 vulns, 86.9), Ubuntu (12 hosts, 81.8), Junos, Solaris, Oracle Linux, Red Hat; among plugin cases Shellshock (#13), then old Flash, BlueKeep, SIGRed, libcurl, Sudo, Log4j. Patch families take 14 of the top 30 because "any critical, any malware-exploited" saturates for hundreds of plugins; order among them rests on breadth, volume and age. **Weights approved by the user.**
 
 ## MCP tools
 
@@ -92,7 +111,10 @@ Components per cluster: max severity, `exploit_available`, `exploited_by_malware
 | `fleet_summary` | Totals, severity distribution, state counts |
 | `clusters` | Ranked list: cluster ID, plugin, score, asset count, max severity, age, one-line reason; `top_n` |
 | `cluster_case` | Summary, score breakdown, affected-asset table, timeline, fleet share, sample plugin output, remediation info, evidence record IDs |
-| `export_case` | Markdown, CSV, JSON handoff; file writes need `confirm=true` |
+| `export_case` | Analyst case file (Markdown, CSV, JSON); file writes need `confirm=true` |
+| `fix_packages` | Ranked fix packages: product, fix type, actions, hosts, impact, cases relieved |
+| `fix_package` | One package in full: actions with vulns cleared, host table, advisory links, CVEs |
+| `export_fix_package` | Engineer handoff (Markdown, CSV, JSON); file writes need `confirm=true` |
 | `record_disposition` | `cluster_id`, `analyst`, `disposition`, `note`, `confirm`; rejects unless `confirm=true` |
 
 The data path comes from `EXPOSURE_CASE_DATA` or a server argument; no tool accepts arbitrary file paths.
@@ -121,9 +143,18 @@ The data path comes from `EXPOSURE_CASE_DATA` or a server argument; no tool acce
 4. [x] python-reviewer pass on Phase 2 code. Fixed: server-supplied chunk IDs (path traversal), non-dict responses, malformed-record crashes in `make_sample.py` (now reuses the engine parser), invalid UTF-8 / deep-nesting / oversized files, 3.10-safe timestamps with any fraction length, `chunks_failed` detection, cleanup after a partial fetch, API keys hidden from client repr/`vars()`, key validation. Not done on purpose: 429 retry/backoff (single export job), treating duplicate `finding_id` as updates (real export has none), numeric-string ports. 87 tests pass.
 
 **Phase 3: engine (test-first)**
-1. [ ] Clustering and fleet-share comparison
-2. [ ] Score components, ranking, documented weights
-3. [ ] Per-cluster timeline; reconciliation test against Tenable counts
+1. [x] Hybrid clustering (`cluster.py`, 19 tests)
+2. [x] Score components, ranking, documented weights (`scoring.py`, 22 tests); hand-checked on the full export
+3. [x] Per-case timeline (`timeline.py`) and reconciliation report (`reconcile.py`), 9 tests
+4. [x] User sign-off on the weights (2026-11-02); CISCO split from patch families
+
+**Phase 3b: fix view (decided 2026-11-02)**
+1. [x] Split CISCO from patch families; correct the PLAN facts about `solution`/VPR
+2. [ ] Extend ingest with fix and risk fields (tests first)
+3. [ ] `fixes.py`: fix packages keyed by normalized product + fix type, impact, deterministic
+4. [ ] Case-fix links (every finding in exactly one case and one package)
+5. [ ] KEV and high VPR folded into the exploit component (weights unchanged); re-hand-check the top 25
+6. [ ] Real `last_fixed` / `resurfaced_date` in the timeline where present
 
 **Phase 4: case and export**
 1. [ ] Case assembly
@@ -162,8 +193,9 @@ Last updated: 2026-11-02, Monday evening.
 - Done: pivot decided and confirmed (finding-cluster cases, reuse repo, tenant data is fake and usable, live fetch allowed as a documented path).
 - Done: Tenable keys stored in `~/.secrets/tenable.cred.xml` (DPAPI); `tenable-env.ps1` loads them per session. Survey scripts live in the session scratchpad, not the repo.
 - Done (Phase 1): package renamed to `exposure_case`; insider generator, data and tests removed; `Finding` now uses `subject`; 8 tests pass; docs rewritten. Nothing is committed yet.
-- Done (Phase 2): `ingest.py`, `scripts/fetch_tenable.py`, `scripts/make_sample.py`, `data/sample/` (1.3 MB, gitleaks clean). 87 tests pass. The full export lives in `data/raw/full1` (gitignored, about 108 MB). Review findings fixed. Nothing is committed yet.
-- Not started: Phase 3 onward.
+- Done (Phase 2): `ingest.py`, `scripts/fetch_tenable.py`, `scripts/make_sample.py`, `data/sample/` (1.3 MB, gitleaks clean). 139 tests pass. The full export lives in `data/raw/full1` (gitignored, about 108 MB). Committed as `094e311`.
+- Done (Phase 3): `cluster.py`, `scoring.py`, `timeline.py`, `reconcile.py`; 139 tests pass; ruff and mypy clean. 815 cases from the full export (15 patch families, 800 plugins). Weights approved.
+- In progress (Phase 3b, fix view): extend ingest with solution/see_also/CVE/VPR/EPSS/KEV/CPE/fix dates; `fixes.py`; case-fix links; KEV in exploit component; real fix dates in timeline. Then Phase 4.
 
 ## Resuming in a new session
 
