@@ -109,7 +109,8 @@ def _exploit_signal(r: FindingRecord) -> tuple[float, str]:
 
 
 def _exploit(c: Cluster) -> ScoreComponent:
-    raw, why = max((_exploit_signal(r) for r in c.active), key=lambda pair: pair[0])
+    # compare (score, reason) so equal scores resolve by text, not by record order
+    raw, why = max(_exploit_signal(r) for r in c.active)
     if any(r.in_the_news for r in c.active):
         raw, why = min(1.0, raw + EXPLOIT_IN_NEWS_BONUS), why + ", in the news"
     return ScoreComponent("exploit", 25, raw, why)

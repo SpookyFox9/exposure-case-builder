@@ -48,6 +48,12 @@ def link_cases_and_fixes(cases: Iterable[Cluster], packages: Iterable[FixPackage
     cases, packages = tuple(cases), tuple(packages)
     case_of = {r.finding_id: c.cluster_id for c in cases for r in c.active}
     package_of = {r.finding_id: p.package_id for p in packages for r in p.active}
+    for name, mapping, total in (
+        ("case", case_of, sum(len(c.active) for c in cases)),
+        ("fix package", package_of, sum(len(p.active) for p in packages)),
+    ):
+        if len(mapping) != total:
+            raise ValueError(f"a finding appears more than once across {name}s")
     if case_of.keys() != package_of.keys():
         stray = sorted(case_of.keys() ^ package_of.keys())[:3]
         raise ValueError(f"findings not in both views, e.g. {stray}")

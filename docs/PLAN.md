@@ -158,6 +158,8 @@ The data path comes from `EXPOSURE_CASE_DATA` or a server argument; no tool acce
 5. [x] CISA KEV and VPR folded into the exploit component, weights unchanged: KEV 1.0, malware 1.0, VPR >= 9 0.9, VPR 7-8.9 0.7, public exploit 0.6, +0.2 in the news (cap 1)
 6. [x] Real `last_fixed` / `resurfaced_date` in the timeline (kinds `fixed`, `reopened`; `last_seen_*` only as fallback). On the full export every fixed or reopened non-info finding has them
 
+Review of the fix view (python-reviewer, 2026-11-02) fixed: overflow on huge JSON integers in optional numeric fields, size caps on untrusted text and lists (4,096 chars, 100 items), package ids that could collide after slugging (now a short hash only on collision), exploit-reason ties resolved by text, a finding appearing in two cases now rejected, host details taken from the latest finding, classifier gaps ("Patch ...", "Updates ...", "Apply the workaround and disable ...", "Microsoft recommends ..."), CPE escapes and NA/wildcard values. **Impact wording:** a package's `impact` is what it CONTAINS across `actions` distinct fix actions; each action carries its own `critical_findings` and `critical_share`. Example: the Windows patch package spans 59 actions and contains 1.3% of the fleet's critical findings, but its biggest single action clears 0.22%. Not acted on: first-CPE ordering (no evidence of a problem in this data) and an EPSS upper bound (values above 1 occur). 259 tests.
+
 Fix-type rule (documented in `fixes.py`): the solution's opening verb decides. update/upgrade/apply/install/"Microsoft has released" = `patch`; "Contact the vendor ... for an update/patch" = `patch` unless it also says disable/configure/remove etc.; everything else = `configuration`; empty = `unspecified`. `has_patch` is NOT used (true for 98% of plugins) and `has_workaround` is always false in this tenant.
 
 **Phase 4: case and export**
@@ -198,7 +200,7 @@ Last updated: 2026-11-02, Monday evening.
 - Done: Tenable keys stored in `~/.secrets/tenable.cred.xml` (DPAPI); `tenable-env.ps1` loads them per session. Survey scripts live in the session scratchpad, not the repo.
 - Done (Phase 1): package renamed to `exposure_case`; insider generator, data and tests removed; `Finding` now uses `subject`; 8 tests pass; docs rewritten. Nothing is committed yet.
 - Done (Phase 2): `ingest.py`, `scripts/fetch_tenable.py`, `scripts/make_sample.py`, `data/sample/` (1.3 MB, gitleaks clean). 139 tests pass. The full export lives in `data/raw/full1` (gitignored, about 108 MB). Committed as `094e311`.
-- Done (Phase 3b): ingest fix fields, `fixes.py`, `links.py`, KEV/VPR in scoring, real fix dates in the timeline; 228 tests, ruff and mypy clean.
+- Done (Phase 3b): ingest fix fields, `fixes.py`, `links.py`, KEV/VPR in scoring, real fix dates in the timeline; 259 tests, ruff and mypy clean.
 - Done (Phase 3): `cluster.py`, `scoring.py`, `timeline.py`, `reconcile.py`; 139 tests pass; ruff and mypy clean. 815 cases from the full export (15 patch families, 800 plugins). Weights approved.
 - Next: Phase 4 (case file and exports for analysts and for engineers), then Phase 5 (MCP server with a `kind` filter on the queue, skill, playbook).
 

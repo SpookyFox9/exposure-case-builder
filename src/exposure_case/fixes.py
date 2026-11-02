@@ -15,6 +15,7 @@ distinct action as given and never claim one update covers another.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -26,35 +27,65 @@ from .ingest import FindingRecord
 from .schema import Evidence
 from .scoring import Score, score_cluster
 
-PATCH_VERBS = frozenset({"update", "upgrade", "apply", "install", "microsoft"})
+PATCH_VERBS = frozenset({
+    "update", "updates", "updated", "upgrade", "upgrades", "upgraded",
+    "apply", "applies", "install", "installs", "patch", "patches",
+})
+_FILLER_WORDS = frozenset({"please", "note", "also", "you", "should", "then"})
 _PATCH_WORD = re.compile(r"\b(update|upgrade|patch)\b")
 _CONFIG_WORD = re.compile(r"\b(disable|enable|configure|reconfigure|restrict|filter|remove|block|harden)\b")
+_WORKAROUND = re.compile(r"\bworkaround\b")
+_MS_RELEASED = re.compile(r"^microsoft has released\b")
+_UNESCAPED_COLON = re.compile(r"(?<!\\):")
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
+
+
+def _cpe_part(part: str) -> str:
+    """One CPE component, or '' for wildcard / not-applicable / empty values."""
+    if part in ("", "-", "*") or "?" in part or "*" in part:
+        return ""
+    return part.replace("\\:", "_").replace("\\", "")
 
 
 def normalize_product(cpe: str) -> str:
     """``vendor:product`` from a CPE 2.2 (``cpe:/a:v:p:ver``) or 2.3 (``cpe:2.3:a:v:p:...``) string, else ''."""
     text = cpe.strip().lower()
     if text.startswith("cpe:2.3:"):
-        parts = text.split(":")[3:]
+        parts = _UNESCAPED_COLON.split(text)[3:]
     elif text.startswith("cpe:/"):
-        parts = text[len("cpe:/"):].split(":")[1:]
+        parts = _UNESCAPED_COLON.split(text[len("cpe:/"):])[1:]
     else:
         return ""
-    if len(parts) < 2 or not parts[0] or not parts[1] or "*" in parts[:2]:
+    if len(parts) < 2:
         return ""
-    return f"{parts[0]}:{parts[1]}"
+    vendor, product = _cpe_part(parts[0]), _cpe_part(parts[1])
+    return f"{vendor}:{product}" if vendor and product else ""
+
+
+def _word(token: str) -> str:
+    return re.sub(r"[^a-z]", "", token.lower())
 
 
 def classify_fix(solution: str) -> str:
-    """'patch' for update/upgrade/apply/install-style fixes, 'configuration' for the rest, 'unspecified' if empty."""
+    """'patch' for update/upgrade/apply/install-style fixes, 'configuration' for the rest, 'unspecified' if empty.
+
+    The opening verb decides (after skipping filler like "Please"). A patch verb followed by a workaround,
+    "Microsoft recommends ...", and "Contact the vendor ... to disable X" are all configuration.
+    """
     words = solution.split()
     if not words:
         return "unspecified"
-    first = re.sub(r"[^a-z]", "", words[0].lower())
+    start = 0
+    while start < len(words) and _word(words[start]) in _FILLER_WORDS:
+        start += 1
+    if start == len(words):
+        return "configuration"
+    first = _word(words[start])
+    text = " ".join(words[start:]).lower()
     if first in PATCH_VERBS:
-        return "patch"
-    text = solution.lower()
+        return "configuration" if _WORKAROUND.search(text) else "patch"
+    if first == "microsoft":
+        return "patch" if _MS_RELEASED.match(text) else "configuration"
     # "Contact the vendor for an update/patch ..." is a patch; "... to disable X" stays configuration.
     if first == "contact" and _PATCH_WORD.search(text) and not _CONFIG_WORD.search(text):
         return "patch"
@@ -68,17 +99,20 @@ def _worst(severities: Iterable[str]) -> str:
 
 @dataclass(frozen=True)
 class FixAction:
-    """One distinct piece of Tenable solution text and how much it clears."""
+    """One distinct piece of Tenable solution text and how much applying just that action clears."""
 
     solution: str
     plugins: int
     findings: int
     hosts: int
     worst_severity: str
+    critical_findings: int
+    critical_share: float  # fraction of the fleet's active critical findings this action alone clears
 
     def to_dict(self) -> dict:
         return {"solution": self.solution, "plugins": self.plugins, "findings": self.findings,
-                "hosts": self.hosts, "worst_severity": self.worst_severity}
+                "hosts": self.hosts, "worst_severity": self.worst_severity,
+                "critical_findings": self.critical_findings, "critical_share": round(self.critical_share, 4)}
 
 
 @dataclass(frozen=True)
@@ -100,8 +134,12 @@ class HostLine:
 
 @dataclass(frozen=True)
 class Impact:
-    """What applying this package clears."""
+    """Totals CONTAINED in this package, summed across ``actions`` distinct fix actions.
 
+    No single action clears all of it unless ``actions`` is 1; per-action figures are on each FixAction.
+    """
+
+    actions: int
     plugins: int
     findings: int
     hosts: int
@@ -109,10 +147,10 @@ class Impact:
     exploitable_findings: int  # public exploit available
     malware_findings: int  # exploited by malware
     kev_findings: int  # on the CISA KEV list
-    critical_share: float  # fraction of the fleet's active critical findings this clears
+    critical_share: float  # fraction of the fleet's active critical findings contained in this package
 
     def to_dict(self) -> dict:
-        return {"plugins": self.plugins, "findings": self.findings, "hosts": self.hosts,
+        return {"actions": self.actions, "plugins": self.plugins, "findings": self.findings, "hosts": self.hosts,
                 "by_severity": dict(self.by_severity), "exploitable_findings": self.exploitable_findings,
                 "malware_findings": self.malware_findings, "kev_findings": self.kev_findings,
                 "critical_share": round(self.critical_share, 4)}
@@ -147,24 +185,42 @@ class FixPackage:
         }
 
 
-def _package_key(record: FindingRecord) -> tuple[str, str, str]:
-    """(package_id, product, fix_type) for a record."""
+def _group_key(record: FindingRecord) -> tuple[str, str, int]:
+    """(product, fix_type, plugin_id or 0): the exact grouping key, never a lossy slug."""
     fix_type = classify_fix(record.solution)
     product = next((p for p in (normalize_product(c) for c in record.cpe) if p), "")
-    if product:
-        return f"fix:{slugify(product)}:{fix_type}", product, fix_type
-    return f"fix:plugin-{record.plugin_id}:{fix_type}", "", fix_type
+    return product, fix_type, (0 if product else record.plugin_id)
 
 
-def _actions(members: list[FindingRecord]) -> tuple[FixAction, ...]:
+def _package_ids(keys: Iterable[tuple[str, str, int]]) -> dict[tuple[str, str, int], str]:
+    """Readable ids; a short hash is added only when two different products share a slug."""
+    keys = list(keys)
+    products_by_slug: dict[str, set[str]] = defaultdict(set)
+    for product, _, _ in keys:
+        if product:
+            products_by_slug[slugify(product)].add(product)
+    ids: dict[tuple[str, str, int], str] = {}
+    for product, fix_type, plugin_id in keys:
+        if not product:
+            ids[(product, fix_type, plugin_id)] = f"fix:plugin-{plugin_id}:{fix_type}"
+            continue
+        slug = slugify(product)
+        if len(products_by_slug[slug]) > 1:
+            slug = f"{slug}-{hashlib.sha1(product.encode(), usedforsecurity=False).hexdigest()[:6]}"
+        ids[(product, fix_type, plugin_id)] = f"fix:{slug}:{fix_type}"
+    return ids
+
+
+def _actions(members: list[FindingRecord], fleet_critical: int) -> tuple[FixAction, ...]:
     groups: dict[str, list[FindingRecord]] = defaultdict(list)
     for r in members:
         groups[" ".join(r.solution.split()) or "(no solution text provided)"].append(r)
-    actions = [
-        FixAction(text, len({r.plugin_id for r in rs}), len(rs), len({r.asset_uuid for r in rs}),
-                  _worst(r.severity for r in rs))
-        for text, rs in groups.items()
-    ]
+    actions = []
+    for text, rs in groups.items():
+        critical = sum(r.severity == "critical" for r in rs)
+        actions.append(FixAction(
+            text, len({r.plugin_id for r in rs}), len(rs), len({r.asset_uuid for r in rs}),
+            _worst(r.severity for r in rs), critical, critical / fleet_critical if fleet_critical else 0.0))
     return tuple(sorted(actions, key=lambda a: (-a.plugins, -a.findings, a.solution)))
 
 
@@ -174,16 +230,18 @@ def _hosts(members: list[FindingRecord]) -> tuple[HostLine, ...]:
         per_host[r.asset_uuid].append(r)
     lines = []
     for uuid, rs in per_host.items():
-        first = min(rs, key=lambda r: r.first_found)
-        lines.append(HostLine(uuid, first.hostname, first.ipv4, first.operating_system[0] if first.operating_system else "",
+        latest = max(rs, key=lambda r: (r.last_found, r.finding_id))  # a renamed host shows today's details
+        lines.append(HostLine(uuid, latest.hostname, latest.ipv4,
+                              latest.operating_system[0] if latest.operating_system else "",
                               len(rs), len({r.plugin_id for r in rs}), _worst(r.severity for r in rs),
-                              first.first_found))
+                              min(r.first_found for r in rs)))
     return tuple(sorted(lines, key=lambda h: (SEVERITY_ORDER.index(h.worst_severity), -h.findings, h.asset_uuid)))
 
 
-def _impact(members: list[FindingRecord], fleet_critical: int) -> Impact:
+def _impact(members: list[FindingRecord], fleet_critical: int, actions: int) -> Impact:
     critical = sum(r.severity == "critical" for r in members)
     return Impact(
+        actions=actions,
         plugins=len({r.plugin_id for r in members}),
         findings=len(members),
         hosts=len({r.asset_uuid for r in members}),
@@ -199,26 +257,25 @@ def build_fix_packages(records: Iterable[FindingRecord]) -> tuple[FixPackage, ..
     """Partition every active, non-info finding into fix packages; sorted by package id."""
     usable = [r for r in records if r.severity != "info"]
     fleet_critical = sum(r.state != "FIXED" and r.severity == "critical" for r in usable)
-    groups: dict[str, list[FindingRecord]] = defaultdict(list)
-    meta: dict[str, tuple[str, str]] = {}
+    groups: dict[tuple[str, str, int], list[FindingRecord]] = defaultdict(list)
     for r in usable:
-        package_id, product, fix_type = _package_key(r)
-        groups[package_id].append(r)
-        meta.setdefault(package_id, (product, fix_type))
+        groups[_group_key(r)].append(r)
+    ids = _package_ids(groups)
 
     packages: list[FixPackage] = []
-    for package_id in sorted(groups):
-        members = sorted((r for r in groups[package_id] if r.state != "FIXED"), key=lambda r: r.finding_id)
+    for key in sorted(groups, key=lambda k: ids[k]):
+        product, fix_type, _ = key
+        members = sorted((r for r in groups[key] if r.state != "FIXED"), key=lambda r: r.finding_id)
         if not members:
             continue
-        product, fix_type = meta[package_id]
         plugin_ids = tuple(sorted({r.plugin_id for r in members}))
         label = product or f"plugin {plugin_ids[0]}"
+        actions = _actions(members, fleet_critical)
         packages.append(FixPackage(
-            package_id=package_id, product=product, fix_type=fix_type, title=f"{label} ({fix_type})",
+            package_id=ids[key], product=product, fix_type=fix_type, title=f"{label} ({fix_type})",
             plugin_ids=plugin_ids, active=tuple(members),
-            fixed_findings=sum(r.state == "FIXED" for r in groups[package_id]),
-            actions=_actions(members), hosts=_hosts(members), impact=_impact(members, fleet_critical),
+            fixed_findings=sum(r.state == "FIXED" for r in groups[key]),
+            actions=actions, hosts=_hosts(members), impact=_impact(members, fleet_critical, len(actions)),
             cves=tuple(sorted({c for r in members for c in r.cves})),
             advisories=tuple(sorted({u for r in members for u in r.see_also})),
         ))

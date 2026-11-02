@@ -14,6 +14,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
+from itertools import islice
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,9 @@ from .schema import Evidence
 
 VALID_STATES = frozenset({"OPEN", "REOPENED", "FIXED"})
 MAX_FILE_BYTES = 256 * 1024 * 1024  # largest export chunk seen is about 36 MB
+MAX_TEXT_CHARS = 4096  # per free-text field (solution, plugin output is allowed twice this)
+MAX_LIST_ITEMS = 100  # per list field (CVEs, advisory links, CPEs)
+TRUNCATION_MARKER = "… [truncated]"
 
 _TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})?$")
 
@@ -111,9 +115,11 @@ def _parse_ts(value: Any, field: str) -> datetime:
         raise IngestError(f"bad timestamp in {field}: {value!r}") from exc
 
 
-def _text(value: Any) -> str:
-    """Strings only: other types (dicts, lists, numbers) become empty, never a repr."""
-    return value if isinstance(value, str) else ""
+def _text(value: Any, limit: int = MAX_TEXT_CHARS) -> str:
+    """Strings only (other types become empty, never a repr), capped so one record cannot bloat output."""
+    if not isinstance(value, str):
+        return ""
+    return value if len(value) <= limit else value[:limit] + TRUNCATION_MARKER
 
 
 def read_json_file(path: Path) -> Any:
@@ -155,16 +161,25 @@ def _opt_int(value: Any) -> int | None:
 
 def _str_tuple(value: Any) -> tuple[str, ...]:
     """A list of strings; anything else (or non-string items) is dropped."""
-    return tuple(v.strip() for v in value if isinstance(v, str) and v.strip()) if isinstance(value, list) else ()
+    if not isinstance(value, list):
+        return ()
+    items = (v.strip()[:MAX_TEXT_CHARS] for v in value if isinstance(v, str) and v.strip())
+    return tuple(islice(items, MAX_LIST_ITEMS))
 
 
 def _opt_number(value: Any, low: float | None = None, high: float | None = None) -> float | None:
     """A real number (never a bool), optionally range-checked; otherwise None."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    if (low is not None and value < low) or (high is not None and value > high):
+    try:
+        number = float(value)  # a huge JSON integer overflows here
+    except OverflowError:
         return None
-    return float(value)
+    if not math.isfinite(number):
+        return None
+    if (low is not None and number < low) or (high is not None and number > high):
+        return None
+    return number
 
 
 def _optional_ts(value: Any) -> datetime | None:
@@ -220,7 +235,7 @@ def parse_record(raw: Any) -> FindingRecord:
         has_patch=bool(plugin.get("has_patch")),
         unsupported_by_vendor=bool(plugin.get("unsupported_by_vendor")),
         checks_for_default_account=bool(plugin.get("checks_for_default_account")),
-        output=_text(raw.get("output")),
+        output=_text(raw.get("output"), MAX_TEXT_CHARS * 2),
         solution=_text(plugin.get("solution")).strip(),
         see_also=_str_tuple(plugin.get("see_also")),
         cves=_str_tuple(plugin.get("cve")),
