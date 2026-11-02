@@ -11,6 +11,7 @@ from exposure_case.timeline import build_timeline
 def with_times(f, first, last):
     import dataclasses
     from datetime import datetime, timezone
+
     return dataclasses.replace(
         f,
         first_found=datetime.fromisoformat(first).replace(tzinfo=timezone.utc),
@@ -23,6 +24,7 @@ def case(*records):
 
 
 # --- timeline ---
+
 
 def test_first_seen_events_are_grouped_per_day_and_sorted():
     c = case(
@@ -65,21 +67,31 @@ def test_timeline_is_chronological_with_stable_kind_order():
 def test_timeline_to_dict():
     c = case(with_times(finding("f1"), "2026-06-02T10:00:00", "2026-11-01T00:00:00"))
     d = build_timeline(c)[0].to_dict()
-    assert d["date"] == "2026-06-02" and d["kind"] == "first_seen" and d["evidence"] == [{"source": "finding", "record_id": "f1"}]
+    assert (
+        d["date"] == "2026-06-02"
+        and d["kind"] == "first_seen"
+        and d["evidence"] == [{"source": "finding", "record_id": "f1"}]
+    )
 
 
 # --- reconciliation ---
+
 
 def info(pid, count):
     return PluginInfo(plugin_id=pid, count=count, vpr_score=None, cvss_base_score=None, cvss3_base_score=None)
 
 
 def test_reconcile_counts_exact_matches_and_mismatches():
-    recs = [finding("f1", plugin=1, asset="a1"), finding("f2", plugin=1, asset="a2"),
-            finding("f3", plugin=2, asset="a1")]
+    recs = [
+        finding("f1", plugin=1, asset="a1"),
+        finding("f2", plugin=1, asset="a2"),
+        finding("f3", plugin=2, asset="a1"),
+    ]
     r = reconcile(recs, {1: info(1, 2), 2: info(2, 3)})
     assert (r.compared, r.exact) == (2, 1)
-    assert [(m.plugin_id, m.export_assets, m.export_findings, m.workbench_count) for m in r.mismatches] == [(2, 1, 1, 3)]
+    assert [(m.plugin_id, m.export_assets, m.export_findings, m.workbench_count) for m in r.mismatches] == [
+        (2, 1, 1, 3)
+    ]
 
 
 def test_reconcile_accepts_finding_instances_as_a_match():
@@ -90,8 +102,11 @@ def test_reconcile_accepts_finding_instances_as_a_match():
 
 
 def test_reconcile_ignores_fixed_and_counts_info_plugins():
-    recs = [finding("f1", plugin=1, asset="a1"), finding("f2", plugin=1, asset="a2", state="FIXED"),
-            finding("f3", plugin=9, asset="a1", severity="info")]
+    recs = [
+        finding("f1", plugin=1, asset="a1"),
+        finding("f2", plugin=1, asset="a2", state="FIXED"),
+        finding("f3", plugin=9, asset="a1", severity="info"),
+    ]
     r = reconcile(recs, {1: info(1, 1), 9: info(9, 1)})
     assert (r.compared, r.exact) == (2, 2)
 

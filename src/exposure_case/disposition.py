@@ -40,8 +40,13 @@ class Disposition:
 
     def to_dict(self) -> dict:
         return {
-            "item_id": self.item_id, "kind": self.kind, "analyst": self.analyst, "disposition": self.disposition,
-            "note": self.note, "recorded_at": self.recorded_at.isoformat(), "data_as_of": self.data_as_of.isoformat(),
+            "item_id": self.item_id,
+            "kind": self.kind,
+            "analyst": self.analyst,
+            "disposition": self.disposition,
+            "note": self.note,
+            "recorded_at": self.recorded_at.isoformat(),
+            "data_as_of": self.data_as_of.isoformat(),
         }
 
 
@@ -75,7 +80,8 @@ def record_disposition(
     """Validate, then append exactly one line. Nothing is written unless every check passes."""
     if confirm is not True:
         raise DispositionError(
-            "recording a disposition requires confirm=true: ask the analyst first (this server cannot verify approval)")
+            "recording a disposition requires confirm=true: ask the analyst first (this server cannot verify approval)"
+        )
     if disposition not in DISPOSITIONS:
         raise DispositionError(f"disposition must be one of {', '.join(DISPOSITIONS)}")
     if kind not in KINDS:
@@ -87,8 +93,15 @@ def record_disposition(
         raise DispositionError(f"analyst is required and at most {MAX_ANALYST_CHARS} characters")
     if not isinstance(note, str) or len(note) > MAX_NOTE_CHARS:
         raise DispositionError(f"note must be text of at most {MAX_NOTE_CHARS} characters")
-    entry = Disposition(item_id, kind, analyst_clean, disposition, _clean(note),
-                        _aware(clock(), "clock()"), _aware(data_as_of, "data_as_of"))
+    entry = Disposition(
+        item_id,
+        kind,
+        analyst_clean,
+        disposition,
+        _clean(note),
+        _aware(clock(), "clock()"),
+        _aware(data_as_of, "data_as_of"),
+    )
 
     target = Path(path)
     try:
@@ -111,8 +124,12 @@ def _parse(line: str, number: int) -> Disposition:
         if not isinstance(data, dict) or any(not isinstance(data.get(k), str) for k in _TEXT_FIELDS):
             raise TypeError("log entry fields must be text")
         return Disposition(
-            item_id=data["item_id"], kind=data["kind"], analyst=data["analyst"], disposition=data["disposition"],
-            note=data["note"], recorded_at=datetime.fromisoformat(data["recorded_at"]),
+            item_id=data["item_id"],
+            kind=data["kind"],
+            analyst=data["analyst"],
+            disposition=data["disposition"],
+            note=data["note"],
+            recorded_at=datetime.fromisoformat(data["recorded_at"]),
             data_as_of=datetime.fromisoformat(data["data_as_of"]),
         )
     except (ValueError, KeyError, TypeError, AttributeError, RecursionError):

@@ -27,10 +27,22 @@ from .ingest import FindingRecord
 from .schema import Evidence
 from .scoring import Score, score_cluster
 
-PATCH_VERBS = frozenset({
-    "update", "updates", "updated", "upgrade", "upgrades", "upgraded",
-    "apply", "applies", "install", "installs", "patch", "patches",
-})
+PATCH_VERBS = frozenset(
+    {
+        "update",
+        "updates",
+        "updated",
+        "upgrade",
+        "upgrades",
+        "upgraded",
+        "apply",
+        "applies",
+        "install",
+        "installs",
+        "patch",
+        "patches",
+    }
+)
 _FILLER_WORDS = frozenset({"please", "note", "also", "you", "should", "then"})
 _PATCH_WORD = re.compile(r"\b(update|upgrade|patch)\b")
 _CONFIG_WORD = re.compile(r"\b(disable|enable|configure|reconfigure|restrict|filter|remove|block|harden)\b")
@@ -53,7 +65,7 @@ def normalize_product(cpe: str) -> str:
     if text.startswith("cpe:2.3:"):
         parts = _UNESCAPED_COLON.split(text)[3:]
     elif text.startswith("cpe:/"):
-        parts = _UNESCAPED_COLON.split(text[len("cpe:/"):])[1:]
+        parts = _UNESCAPED_COLON.split(text[len("cpe:/") :])[1:]
     else:
         return ""
     if len(parts) < 2:
@@ -110,9 +122,15 @@ class FixAction:
     critical_share: float  # fraction of the fleet's active critical findings this action alone clears
 
     def to_dict(self) -> dict:
-        return {"solution": self.solution, "plugins": self.plugins, "findings": self.findings,
-                "hosts": self.hosts, "worst_severity": self.worst_severity,
-                "critical_findings": self.critical_findings, "critical_share": round(self.critical_share, 4)}
+        return {
+            "solution": self.solution,
+            "plugins": self.plugins,
+            "findings": self.findings,
+            "hosts": self.hosts,
+            "worst_severity": self.worst_severity,
+            "critical_findings": self.critical_findings,
+            "critical_share": round(self.critical_share, 4),
+        }
 
 
 @dataclass(frozen=True)
@@ -127,9 +145,16 @@ class HostLine:
     oldest_first_found: datetime
 
     def to_dict(self) -> dict:
-        return {"asset_uuid": self.asset_uuid, "hostname": self.hostname, "ipv4": self.ipv4,
-                "operating_system": self.operating_system, "findings": self.findings, "plugins": self.plugins,
-                "worst_severity": self.worst_severity, "oldest_first_found": self.oldest_first_found.isoformat()}
+        return {
+            "asset_uuid": self.asset_uuid,
+            "hostname": self.hostname,
+            "ipv4": self.ipv4,
+            "operating_system": self.operating_system,
+            "findings": self.findings,
+            "plugins": self.plugins,
+            "worst_severity": self.worst_severity,
+            "oldest_first_found": self.oldest_first_found.isoformat(),
+        }
 
 
 @dataclass(frozen=True)
@@ -150,10 +175,17 @@ class Impact:
     critical_share: float  # fraction of the fleet's active critical findings contained in this package
 
     def to_dict(self) -> dict:
-        return {"actions": self.actions, "plugins": self.plugins, "findings": self.findings, "hosts": self.hosts,
-                "by_severity": dict(self.by_severity), "exploitable_findings": self.exploitable_findings,
-                "malware_findings": self.malware_findings, "kev_findings": self.kev_findings,
-                "critical_share": round(self.critical_share, 4)}
+        return {
+            "actions": self.actions,
+            "plugins": self.plugins,
+            "findings": self.findings,
+            "hosts": self.hosts,
+            "by_severity": dict(self.by_severity),
+            "exploitable_findings": self.exploitable_findings,
+            "malware_findings": self.malware_findings,
+            "kev_findings": self.kev_findings,
+            "critical_share": round(self.critical_share, 4),
+        }
 
 
 @dataclass(frozen=True)
@@ -177,11 +209,19 @@ class FixPackage:
     def to_dict(self, max_hosts: int | None = None) -> dict:
         hosts = self.hosts if max_hosts is None else self.hosts[:max_hosts]
         return {
-            "package_id": self.package_id, "product": self.product, "fix_type": self.fix_type, "title": self.title,
-            "plugin_ids": list(self.plugin_ids), "impact": self.impact.to_dict(),
-            "actions": [a.to_dict() for a in self.actions], "hosts": [h.to_dict() for h in hosts],
-            "hosts_total": len(self.hosts), "fixed_findings": self.fixed_findings,
-            "cves": list(self.cves), "advisories": list(self.advisories), "evidence_count": len(self.active),
+            "package_id": self.package_id,
+            "product": self.product,
+            "fix_type": self.fix_type,
+            "title": self.title,
+            "plugin_ids": list(self.plugin_ids),
+            "impact": self.impact.to_dict(),
+            "actions": [a.to_dict() for a in self.actions],
+            "hosts": [h.to_dict() for h in hosts],
+            "hosts_total": len(self.hosts),
+            "fixed_findings": self.fixed_findings,
+            "cves": list(self.cves),
+            "advisories": list(self.advisories),
+            "evidence_count": len(self.active),
         }
 
 
@@ -218,9 +258,17 @@ def _actions(members: list[FindingRecord], fleet_critical: int) -> tuple[FixActi
     actions = []
     for text, rs in groups.items():
         critical = sum(r.severity == "critical" for r in rs)
-        actions.append(FixAction(
-            text, len({r.plugin_id for r in rs}), len(rs), len({r.asset_uuid for r in rs}),
-            _worst(r.severity for r in rs), critical, critical / fleet_critical if fleet_critical else 0.0))
+        actions.append(
+            FixAction(
+                text,
+                len({r.plugin_id for r in rs}),
+                len(rs),
+                len({r.asset_uuid for r in rs}),
+                _worst(r.severity for r in rs),
+                critical,
+                critical / fleet_critical if fleet_critical else 0.0,
+            )
+        )
     return tuple(sorted(actions, key=lambda a: (-a.plugins, -a.findings, a.solution)))
 
 
@@ -231,10 +279,18 @@ def host_lines(members: list[FindingRecord]) -> tuple[HostLine, ...]:
     lines = []
     for uuid, rs in per_host.items():
         latest = max(rs, key=lambda r: (r.last_found, r.finding_id))  # a renamed host shows today's details
-        lines.append(HostLine(uuid, latest.hostname, latest.ipv4,
-                              latest.operating_system[0] if latest.operating_system else "",
-                              len(rs), len({r.plugin_id for r in rs}), _worst(r.severity for r in rs),
-                              min(r.first_found for r in rs)))
+        lines.append(
+            HostLine(
+                uuid,
+                latest.hostname,
+                latest.ipv4,
+                latest.operating_system[0] if latest.operating_system else "",
+                len(rs),
+                len({r.plugin_id for r in rs}),
+                _worst(r.severity for r in rs),
+                min(r.first_found for r in rs),
+            )
+        )
     return tuple(sorted(lines, key=lambda h: (SEVERITY_ORDER.index(h.worst_severity), -h.findings, h.asset_uuid)))
 
 
@@ -271,22 +327,35 @@ def build_fix_packages(records: Iterable[FindingRecord]) -> tuple[FixPackage, ..
         plugin_ids = tuple(sorted({r.plugin_id for r in members}))
         label = product or f"plugin {plugin_ids[0]}"
         actions = _actions(members, fleet_critical)
-        packages.append(FixPackage(
-            package_id=ids[key], product=product, fix_type=fix_type, title=f"{label} ({fix_type})",
-            plugin_ids=plugin_ids, active=tuple(members),
-            fixed_findings=sum(r.state == "FIXED" for r in groups[key]),
-            actions=actions, hosts=host_lines(members), impact=_impact(members, fleet_critical, len(actions)),
-            cves=tuple(sorted({c for r in members for c in r.cves})),
-            advisories=tuple(sorted({u for r in members for u in r.see_also})),
-        ))
+        packages.append(
+            FixPackage(
+                package_id=ids[key],
+                product=product,
+                fix_type=fix_type,
+                title=f"{label} ({fix_type})",
+                plugin_ids=plugin_ids,
+                active=tuple(members),
+                fixed_findings=sum(r.state == "FIXED" for r in groups[key]),
+                actions=actions,
+                hosts=host_lines(members),
+                impact=_impact(members, fleet_critical, len(actions)),
+                cves=tuple(sorted({c for r in members for c in r.cves})),
+                advisories=tuple(sorted({u for r in members for u in r.see_also})),
+            )
+        )
     return tuple(packages)
 
 
 def as_cluster(package: FixPackage) -> Cluster:
     """View a package as a Cluster so the approved scoring weights apply to it unchanged."""
     return Cluster(
-        cluster_id=package.package_id, kind="fix", title=package.title,
-        family="", plugin_ids=package.plugin_ids, active=package.active, fixed=(),
+        cluster_id=package.package_id,
+        kind="fix",
+        title=package.title,
+        family="",
+        plugin_ids=package.plugin_ids,
+        active=package.active,
+        fixed=(),
     )
 
 

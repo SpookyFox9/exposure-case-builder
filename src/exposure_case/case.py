@@ -23,10 +23,14 @@ SCOPE_NOTE = (
 )
 LIMITATIONS = (
     "Hostnames, IP addresses and similar identifiers in this tenant are masked and are treated as opaque identifiers.",
-    ("Scores and counts are computed from Tenable export records, and every finding ID is listed. This is evidence "
-     "for prioritization and is not a verdict on any person or team."),
-    ("Timeline dates come from Tenable's first-found and last-found dates and, where present, its fixed and "
-     "resurfaced dates."),
+    (
+        "Scores and counts are computed from Tenable export records, and every finding ID is listed. This is evidence "
+        "for prioritization and is not a verdict on any person or team."
+    ),
+    (
+        "Timeline dates come from Tenable's first-found and last-found dates and, where present, its fixed and "
+        "resurfaced dates."
+    ),
     "Fix actions are Tenable's own solution text; Tenable's data does not state that one update replaces another.",
 )
 MAX_CVES_PER_VULN = 5
@@ -49,10 +53,19 @@ class VulnLine:
     solution: str
 
     def to_dict(self) -> dict:
-        return {"plugin_id": self.plugin_id, "name": self.name, "severity": self.severity, "hosts": self.hosts,
-                "findings": self.findings, "cves": list(self.cves), "on_cisa_kev": self.on_cisa_kev,
-                "vpr_score": self.vpr_score, "exploit_available": self.exploit_available,
-                "fix_type": self.fix_type, "solution": self.solution}
+        return {
+            "plugin_id": self.plugin_id,
+            "name": self.name,
+            "severity": self.severity,
+            "hosts": self.hosts,
+            "findings": self.findings,
+            "cves": list(self.cves),
+            "on_cisa_kev": self.on_cisa_kev,
+            "vpr_score": self.vpr_score,
+            "exploit_available": self.exploit_available,
+            "fix_type": self.fix_type,
+            "solution": self.solution,
+        }
 
 
 def _plural(n: int, word: str, many: str | None = None) -> str:
@@ -68,16 +81,33 @@ def vulnerability_lines(members: list[FindingRecord]) -> tuple[VulnLine, ...]:
     for plugin_id, rs in by_plugin.items():
         rep = min(rs, key=lambda r: r.finding_id)
         vprs = [r.vpr_score for r in rs if r.vpr_score is not None]
-        lines.append(VulnLine(
-            plugin_id=plugin_id, name=rep.plugin_name, severity=min((r.severity for r in rs), key=SEVERITY_ORDER.index),
-            hosts=len({r.asset_uuid for r in rs}), findings=len(rs),
-            cves=tuple(sorted({c for r in rs for c in r.cves}))[:MAX_CVES_PER_VULN],
-            on_cisa_kev=any(r.on_cisa_kev for r in rs), vpr_score=max(vprs) if vprs else None,
-            exploit_available=any(r.exploit_available for r in rs), fix_type=classify_fix(rep.solution),
-            solution=" ".join(rep.solution.split()),
-        ))
-    return tuple(sorted(lines, key=lambda v: (SEVERITY_ORDER.index(v.severity), not v.on_cisa_kev,
-                                              -(v.vpr_score if v.vpr_score is not None else -1.0), -v.hosts, v.plugin_id)))
+        lines.append(
+            VulnLine(
+                plugin_id=plugin_id,
+                name=rep.plugin_name,
+                severity=min((r.severity for r in rs), key=SEVERITY_ORDER.index),
+                hosts=len({r.asset_uuid for r in rs}),
+                findings=len(rs),
+                cves=tuple(sorted({c for r in rs for c in r.cves}))[:MAX_CVES_PER_VULN],
+                on_cisa_kev=any(r.on_cisa_kev for r in rs),
+                vpr_score=max(vprs) if vprs else None,
+                exploit_available=any(r.exploit_available for r in rs),
+                fix_type=classify_fix(rep.solution),
+                solution=" ".join(rep.solution.split()),
+            )
+        )
+    return tuple(
+        sorted(
+            lines,
+            key=lambda v: (
+                SEVERITY_ORDER.index(v.severity),
+                not v.on_cisa_kev,
+                -(v.vpr_score if v.vpr_score is not None else -1.0),
+                -v.hosts,
+                v.plugin_id,
+            ),
+        )
+    )
 
 
 def case_facts(members: list[FindingRecord], as_of: datetime) -> dict:
@@ -100,13 +130,18 @@ def facts_summary(facts: dict, as_of: datetime) -> tuple[str, ...]:
     """Plain, checkable statements; every number comes straight from ``facts``."""
     worst = next((s for s in SEVERITY_ORDER if facts["by_severity"].get(s)), "info")
     lines = [
-        (f"{_plural(facts['hosts'], 'host')}, {_plural(facts['findings'], 'finding')} across "
-         f"{_plural(facts['vulnerabilities'], 'vulnerability', 'vulnerabilities')}."),
+        (
+            f"{_plural(facts['hosts'], 'host')}, {_plural(facts['findings'], 'finding')} across "
+            f"{_plural(facts['vulnerabilities'], 'vulnerability', 'vulnerabilities')}."
+        ),
         f"Worst severity: {worst}.",
     ]
-    for key, text in (("kev_findings", "on the CISA KEV list"), ("malware_findings", "exploited by malware"),
-                      ("exploitable_findings", "with a public exploit available"),
-                      ("reopened_findings", "reopened after being fixed")):
+    for key, text in (
+        ("kev_findings", "on the CISA KEV list"),
+        ("malware_findings", "exploited by malware"),
+        ("exploitable_findings", "with a public exploit available"),
+        ("reopened_findings", "reopened after being fixed"),
+    ):
         if facts[key]:
             lines.append(f"{_plural(facts[key], 'finding')} {text}.")
     lines.append(
@@ -135,12 +170,21 @@ class CaseFile:
 
     def to_dict(self) -> dict:
         return {
-            "case_id": self.case_id, "title": self.title, "kind": self.kind, "rank": self.rank,
-            "score": self.score.to_dict(), "facts": self.facts, "facts_summary": list(self.facts_summary),
-            "fixes": [f.to_dict() for f in self.fixes], "hosts": [h.to_dict() for h in self.hosts],
+            "case_id": self.case_id,
+            "title": self.title,
+            "kind": self.kind,
+            "rank": self.rank,
+            "score": self.score.to_dict(),
+            "facts": self.facts,
+            "facts_summary": list(self.facts_summary),
+            "fixes": [f.to_dict() for f in self.fixes],
+            "hosts": [h.to_dict() for h in self.hosts],
             "vulnerabilities": [v.to_dict() for v in self.vulnerabilities],
-            "timeline": [e.to_dict() for e in self.timeline], "evidence_ids": list(self.evidence_ids),
-            "limitations": list(self.limitations), "as_of": self.as_of.isoformat(), "disposition": self.disposition,
+            "timeline": [e.to_dict() for e in self.timeline],
+            "evidence_ids": list(self.evidence_ids),
+            "limitations": list(self.limitations),
+            "as_of": self.as_of.isoformat(),
+            "disposition": self.disposition,
         }
 
 
@@ -151,10 +195,20 @@ def build_case_file(ranked: RankedCluster, links: Links, as_of: datetime) -> Cas
     members = list(case.active)
     facts = case_facts(members, as_of)
     return CaseFile(
-        case_id=case.cluster_id, title=case.title, kind=case.kind, rank=ranked.rank, score=ranked.score,
-        facts=facts, facts_summary=facts_summary(facts, as_of), fixes=links.fixes_for(case.cluster_id),
-        hosts=host_lines(members), vulnerabilities=vulnerability_lines(members), timeline=build_timeline(case),
-        evidence_ids=tuple(e.record_id for e in case.evidence()), limitations=LIMITATIONS, as_of=as_of,
+        case_id=case.cluster_id,
+        title=case.title,
+        kind=case.kind,
+        rank=ranked.rank,
+        score=ranked.score,
+        facts=facts,
+        facts_summary=facts_summary(facts, as_of),
+        fixes=links.fixes_for(case.cluster_id),
+        hosts=host_lines(members),
+        vulnerabilities=vulnerability_lines(members),
+        timeline=build_timeline(case),
+        evidence_ids=tuple(e.record_id for e in case.evidence()),
+        limitations=LIMITATIONS,
+        as_of=as_of,
     )
 
 
@@ -176,15 +230,24 @@ class PackageView:
 
     def to_dict(self, max_hosts: int | None = None) -> dict:
         return {
-            "rank": self.rank, "score": self.score.to_dict(), "package": self.package.to_dict(max_hosts),
-            "cases": [c.to_dict() for c in self.cases], "priority_reasons": list(self.priority_reasons),
-            "scope_note": SCOPE_NOTE, "limitations": list(LIMITATIONS),
-            "evidence_ids": [e.record_id for e in self.package.evidence()], "as_of": self.as_of.isoformat(),
+            "rank": self.rank,
+            "score": self.score.to_dict(),
+            "package": self.package.to_dict(max_hosts),
+            "cases": [c.to_dict() for c in self.cases],
+            "priority_reasons": list(self.priority_reasons),
+            "scope_note": SCOPE_NOTE,
+            "limitations": list(LIMITATIONS),
+            "evidence_ids": [e.record_id for e in self.package.evidence()],
+            "as_of": self.as_of.isoformat(),
         }
 
 
 def build_package_view(ranked: RankedPackage, links: Links, as_of: datetime) -> PackageView:
     return PackageView(
-        rank=ranked.rank, score=ranked.score, package=ranked.package,
-        cases=links.cases_for(ranked.package.package_id), priority_reasons=priority_reasons(ranked.score), as_of=as_of,
+        rank=ranked.rank,
+        score=ranked.score,
+        package=ranked.package,
+        cases=links.cases_for(ranked.package.package_id),
+        priority_reasons=priority_reasons(ranked.score),
+        as_of=as_of,
     )

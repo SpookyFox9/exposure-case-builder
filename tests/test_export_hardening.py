@@ -41,9 +41,17 @@ def unescaped(text: str, chars: str) -> list[str]:
 
 # --- markdown injection ---
 
-@pytest.mark.parametrize("payload", [
-    "\\<img src=x onerror=1>", "\\\\<b>", "a\\", "<script>x</script>", "\\\\\\<i>",
-])
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "\\<img src=x onerror=1>",
+        "\\\\<b>",
+        "a\\",
+        "<script>x</script>",
+        "\\\\\\<i>",
+    ],
+)
 def test_backslashes_cannot_defeat_the_angle_bracket_escape(payload):
     assert unescaped(md_text(payload), "<>") == []
 
@@ -58,9 +66,15 @@ def test_backslash_pipe_cannot_split_a_table_row():
     assert unescaped(cell, "|") == []
 
 
-@pytest.mark.parametrize("payload", [
-    "[Apply patch](javascript:alert(1))", "![](https://tracker.test/x.png)", "[KB](https://evil.test)", "]( x",
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "[Apply patch](javascript:alert(1))",
+        "![](https://tracker.test/x.png)",
+        "[KB](https://evil.test)",
+        "]( x",
+    ],
+)
 def test_links_and_images_are_defused(payload):
     out = md_text(payload)
     assert unescaped(out, "[]") == []
@@ -92,6 +106,7 @@ def test_identifiers_with_backticks_cannot_break_out_of_code_spans():
 
 # --- csv ---
 
+
 @pytest.mark.parametrize("bad", [" =1+1", "\x00=1", "\u200b=1", "\u202e=1", "\n=1", "  @SUM(A1)", " \t-2+3"])
 def test_csv_formulas_are_neutralized_after_cleaning(bad):
     assert csv_cell(bad).startswith("'")
@@ -113,19 +128,32 @@ def test_csv_round_trips_non_ascii(world, tmp_path):  # noqa: F811
     recs = [dataclasses.replace(fx("f1"), hostname="srv-é-日本")]
     _, packages, links = build(recs)
     text = package_hosts_csv(build_package_view(packages[0], links, NOW))
-    assert "srv-é-日本" in next(csv.reader(io.StringIO(text), skipinitialspace=False))[1:2] + [text] or "srv-é-日本" in text
+    assert (
+        "srv-é-日本" in next(csv.reader(io.StringIO(text), skipinitialspace=False))[1:2] + [text]
+        or "srv-é-日本" in text
+    )
 
 
 # --- percentages ---
 
-@pytest.mark.parametrize("share,expected", [
-    (0.0, "0.0%"), (1.0, "100.0%"), (0.9996, "99.9%"), (0.0004, "under 0.1%"), (0.5, "50.0%"), (0.0015, "0.1%"),
-])
+
+@pytest.mark.parametrize(
+    "share,expected",
+    [
+        (0.0, "0.0%"),
+        (1.0, "100.0%"),
+        (0.9996, "99.9%"),
+        (0.0004, "under 0.1%"),
+        (0.5, "50.0%"),
+        (0.0015, "0.1%"),
+    ],
+)
 def test_percentages_never_round_up_to_a_full_clear(share, expected):
     assert _pct(share) == expected
 
 
 # --- writing files ---
+
 
 def test_file_names_carry_a_hash_so_lossy_slugs_cannot_collide(world, tmp_path):  # noqa: F811
     view = package_view(world)
@@ -141,7 +169,7 @@ def test_reserved_and_long_names_are_safe(world, tmp_path):  # noqa: F811
     for pid in ("con", "NUL", "x" * 500, "日本語"):
         v = dataclasses.replace(view, package=dataclasses.replace(view.package, package_id=pid))
         for p in write_package_export(v, tmp_path, confirm=True):
-            assert len(p.name) <= 100 and not p.stem.lower() in ("con", "nul", "aux")
+            assert len(p.name) <= 100 and p.stem.lower() not in ("con", "nul", "aux")
 
 
 def test_existing_symlink_target_is_replaced_not_followed(world, tmp_path):  # noqa: F811
@@ -191,6 +219,7 @@ def test_case_and_package_with_the_same_stem_do_not_share_files(world, tmp_path)
 
 
 # --- case wording and robustness ---
+
 
 def test_wording_does_not_overstate_what_a_package_clears(world):  # noqa: F811
     md = case_markdown(case_file(world))

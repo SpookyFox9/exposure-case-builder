@@ -12,8 +12,16 @@ RH = "Red Hat Local Security Checks"
 
 
 def fx(fid, plugin, cpe, asset="a1", family="General", severity="high", **extra):
-    return finding(fid, plugin=plugin, asset=asset, family=family, severity=severity,
-                   solution="Update the package.", cpe=[cpe], **extra)
+    return finding(
+        fid,
+        plugin=plugin,
+        asset=asset,
+        family=family,
+        severity=severity,
+        solution="Update the package.",
+        cpe=[cpe],
+        **extra,
+    )
 
 
 @pytest.fixture
@@ -49,9 +57,14 @@ def test_many_to_many_shape(world):
     links = link_cases_and_fixes(cases, packages)
     family_case = links.fixes_for("family:red-hat-local-security-checks")
     assert {(link.other_id, link.findings) for link in family_case} == {
-        ("fix:redhat-enterprise-linux:patch", 2), ("fix:gnu-bash:patch", 1)}
+        ("fix:redhat-enterprise-linux:patch", 2),
+        ("fix:gnu-bash:patch", 1),
+    }
     bash = links.cases_for("fix:gnu-bash:patch")
-    assert {(link.other_id, link.findings) for link in bash} == {("family:red-hat-local-security-checks", 1), ("plugin:4", 1)}
+    assert {(link.other_id, link.findings) for link in bash} == {
+        ("family:red-hat-local-security-checks", 1),
+        ("plugin:4", 1),
+    }
 
 
 def test_links_are_sorted_largest_first_then_id(world):
@@ -81,6 +94,7 @@ def test_inconsistent_universes_are_rejected(world):
 
 # --- ranking packages with the same approved weights ---
 
+
 def test_as_cluster_exposes_the_package_findings(world):
     _, _, packages = world
     c = as_cluster(packages[0])
@@ -88,9 +102,11 @@ def test_as_cluster_exposes_the_package_findings(world):
 
 
 def test_rank_packages_orders_by_score_then_id():
-    recs = [fx("f1", 1, "cpe:/a:v:low", severity="low", exploit_available=False),
-            fx("f2", 2, "cpe:/a:v:crit", severity="critical", exploited_by_malware=True),
-            fx("f3", 3, "cpe:/a:v:med", severity="medium", exploit_available=False)]
+    recs = [
+        fx("f1", 1, "cpe:/a:v:low", severity="low", exploit_available=False),
+        fx("f2", 2, "cpe:/a:v:crit", severity="critical", exploited_by_malware=True),
+        fx("f3", 3, "cpe:/a:v:med", severity="medium", exploit_available=False),
+    ]
     ranked = rank_packages(build_fix_packages(recs), 10, NOW)
     assert [r.package.product for r in ranked] == ["v:crit", "v:med", "v:low"]
     assert [r.rank for r in ranked] == [1, 2, 3]

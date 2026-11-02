@@ -11,8 +11,12 @@ def _evidence():
 
 def _finding(**overrides):
     base = {
-        "id": "X1", "detector": "E1", "subject": "plugin:10114",
-        "score": 1.0, "rationale": "r", "evidence": _evidence(),
+        "id": "X1",
+        "detector": "E1",
+        "subject": "plugin:10114",
+        "score": 1.0,
+        "rationale": "r",
+        "evidence": _evidence(),
     }
     return Finding(**{**base, **overrides})
 

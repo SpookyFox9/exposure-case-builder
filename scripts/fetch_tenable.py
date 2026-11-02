@@ -89,8 +89,13 @@ class TenableClient:
 
     __slots__ = ("_auth", "_opener", "_user_agent")
 
-    def __init__(self, access_key: str, secret_key: str, opener: Callable[..., Any] = urllib.request.urlopen,
-                 agent: str | None = None):
+    def __init__(
+        self,
+        access_key: str,
+        secret_key: str,
+        opener: Callable[..., Any] = urllib.request.urlopen,
+        agent: str | None = None,
+    ):
         self._auth = f"accessKey={access_key};secretKey={secret_key}"
         self._opener = opener
         self._user_agent = agent or user_agent()
@@ -99,8 +104,12 @@ class TenableClient:
         return "TenableClient(<credentials hidden>)"
 
     def _headers(self) -> dict[str, str]:
-        return {"X-ApiKeys": self._auth, "User-Agent": self._user_agent, "Accept": "application/json",
-                "Content-Type": "application/json"}
+        return {
+            "X-ApiKeys": self._auth,
+            "User-Agent": self._user_agent,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
 
     def request(self, method: str, path: str, body: dict | None = None) -> Any:
         data = json.dumps(body).encode("utf-8") if body is not None else None
@@ -138,7 +147,9 @@ def _validated_chunk_ids(status: dict) -> list[int]:
     return chunks
 
 
-def _poll_until_finished(client: TenableClient, export_uuid: str, sleep: Callable[[float], None], max_polls: int) -> dict:
+def _poll_until_finished(
+    client: TenableClient, export_uuid: str, sleep: Callable[[float], None], max_polls: int
+) -> dict:
     for _ in range(max_polls):
         status = client.request("GET", f"/vulns/export/{export_uuid}/status")
         if not isinstance(status, dict):

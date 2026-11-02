@@ -18,17 +18,70 @@ ROOT = Path(__file__).resolve().parent.parent
 LISTING = ROOT / "docs" / "exchange" / "mcp-server-listing.md"
 PLACEHOLDER = "REPLACE_WITH_YOUR_ACCEPTANCE_TIMESTAMP"
 
-DOMAINS = {"ai-security", "application-security", "cloud-security", "cryptography-pki", "data-security",
-           "email-collaboration-security", "governance-risk-compliance", "identity-access", "network-security",
-           "ot-iot-security", "platform-operations", "security-awareness", "security-operations",
-           "threat-intelligence", "vulnerability-management"}
-INTEGRATIONS = {"Anthropic", "AWS", "Azure", "Check Point", "Cisco", "CrowdStrike", "Firebase", "Fortinet", "GCP",
-                "IPGeolocation.io", "KnowBe4", "Microsoft Sentinel", "Mimecast", "Netskope", "NVD", "PagerDuty",
-                "Palo Alto", "Qualys", "Rapid7", "Recorded Future", "SentinelOne", "ServiceNow", "Snyk", "Splunk",
-                "Supabase", "Tenable", "Tenable Hexa AI MCP", "URLScan.io", "VirusTotal", "Wiz", "Checkmarx One",
-                "SecurityScorecard"}
-CLIENTS = {"Antigravity", "ChatGPT", "Claude Code", "Claude Desktop", "Cline", "Codex", "Continue", "Cursor",
-           "Gemini CLI", "VS Code Copilot", "Windsurf"}
+DOMAINS = {
+    "ai-security",
+    "application-security",
+    "cloud-security",
+    "cryptography-pki",
+    "data-security",
+    "email-collaboration-security",
+    "governance-risk-compliance",
+    "identity-access",
+    "network-security",
+    "ot-iot-security",
+    "platform-operations",
+    "security-awareness",
+    "security-operations",
+    "threat-intelligence",
+    "vulnerability-management",
+}
+INTEGRATIONS = {
+    "Anthropic",
+    "AWS",
+    "Azure",
+    "Check Point",
+    "Cisco",
+    "CrowdStrike",
+    "Firebase",
+    "Fortinet",
+    "GCP",
+    "IPGeolocation.io",
+    "KnowBe4",
+    "Microsoft Sentinel",
+    "Mimecast",
+    "Netskope",
+    "NVD",
+    "PagerDuty",
+    "Palo Alto",
+    "Qualys",
+    "Rapid7",
+    "Recorded Future",
+    "SentinelOne",
+    "ServiceNow",
+    "Snyk",
+    "Splunk",
+    "Supabase",
+    "Tenable",
+    "Tenable Hexa AI MCP",
+    "URLScan.io",
+    "VirusTotal",
+    "Wiz",
+    "Checkmarx One",
+    "SecurityScorecard",
+}
+CLIENTS = {
+    "Antigravity",
+    "ChatGPT",
+    "Claude Code",
+    "Claude Desktop",
+    "Cline",
+    "Codex",
+    "Continue",
+    "Cursor",
+    "Gemini CLI",
+    "VS Code Copilot",
+    "Windsurf",
+}
 TRANSPORTS = {"stdio", "http", "both"}
 RUNTIMES = {"binary", "bun", "go", "node", "python", "rust"}
 AUTH = {"api-key", "none", "oauth2", "token"}
@@ -72,9 +125,26 @@ def real_tools(tmp_path_factory):
 
 def test_required_fields_present(listing):
     meta, _, _ = listing
-    required = ["name", "author", "github_url", "description", "license", "tier", "tags", "domains", "integrations",
-                "date_added", "contribution_agreement_date", "transport", "runtime", "auth_method",
-                "compatible_clients", "tools_exposed", "resources_exposed", "prompts_exposed"]
+    required = [
+        "name",
+        "author",
+        "github_url",
+        "description",
+        "license",
+        "tier",
+        "tags",
+        "domains",
+        "integrations",
+        "date_added",
+        "contribution_agreement_date",
+        "transport",
+        "runtime",
+        "auth_method",
+        "compatible_clients",
+        "tools_exposed",
+        "resources_exposed",
+        "prompts_exposed",
+    ]
     assert not [f for f in required if f not in meta and f != "tools_exposed"]
 
 

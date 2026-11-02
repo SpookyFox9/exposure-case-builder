@@ -25,12 +25,14 @@ def first_case(ws, kind="threats"):
 
 # --- loading ---
 
+
 def test_missing_data_directory_is_a_clear_error(tmp_path):
     with pytest.raises(ServiceError, match="data"):
         Workspace.load(tmp_path / "nope", exports_dir=tmp_path / "e", dispositions_path=tmp_path / "d.jsonl")
 
 
 # --- fleet summary ---
+
 
 def test_fleet_summary_is_consistent(ws, records):
     s = ws.fleet_summary()
@@ -43,6 +45,7 @@ def test_fleet_summary_is_consistent(ws, records):
 
 
 # --- queues ---
+
 
 def test_case_queue_returns_two_lists_by_default(ws):
     q = ws.case_queue(top_n=5)
@@ -98,6 +101,7 @@ def test_hide_dispositioned_removes_decided_items(ws):
 
 # --- case file ---
 
+
 def test_case_file_is_capped_with_totals(ws):
     cid = ws.case_queue(kind="backlogs", top_n=1)["items"][0]["case_id"]
     cf = ws.case_file(cid, max_hosts=3, max_vulns=4, max_events=5)
@@ -139,6 +143,7 @@ def test_case_file_limits_validated(ws, kwargs):
 
 # --- fix package ---
 
+
 def test_fix_package_is_capped_and_scoped(ws):
     pid = ws.fix_queue(top_n=1)["items"][0]["package_id"]
     p = ws.fix_package(pid, max_hosts=2, max_actions=3)
@@ -149,6 +154,7 @@ def test_fix_package_is_capped_and_scoped(ws):
 
 
 # --- findings (so narratives can cite real ids) ---
+
 
 def test_findings_page_real_records(ws, records):
     cid = first_case(ws)
@@ -179,6 +185,7 @@ def test_findings_limits_validated(ws, kwargs):
 
 
 # --- exports ---
+
 
 def test_export_returns_markdown_without_writing(ws, tmp_path):
     out = ws.export(first_case(ws), "markdown")
@@ -215,6 +222,7 @@ def test_export_write_creates_the_files(ws, tmp_path):
 
 
 # --- dispositions ---
+
 
 def test_record_disposition_infers_kind_and_logs(ws, tmp_path):
     pid = ws.fix_queue(top_n=1)["items"][0]["package_id"]

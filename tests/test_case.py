@@ -23,8 +23,16 @@ def world():
         fx("f1", plugin=1, asset="a1", severity="critical", exploit_available=True, cve=["CVE-1"]),
         fx("f2", plugin=1, asset="a2", severity="critical", exploit_available=True, cve=["CVE-1"]),
         fx("f3", plugin=2, asset="a1", severity="low", solution="Disable the service.", exploit_available=False),
-        fx("f4", plugin=3, asset="a3", severity="medium", cpe="cpe:/a:o:o", exploit_available=False,
-           vpr={"on_cisa_kev": True}, state="REOPENED"),
+        fx(
+            "f4",
+            plugin=3,
+            asset="a3",
+            severity="medium",
+            cpe="cpe:/a:o:o",
+            exploit_available=False,
+            vpr={"on_cisa_kev": True},
+            state="REOPENED",
+        ),
     ]
     cases, packages = build_clusters(recs), build_fix_packages(recs)
     links = link_cases_and_fixes(cases, packages)
@@ -94,8 +102,18 @@ def test_case_file_json_ready_and_deterministic(world):
     a = build_case_file(case_by_id(cases, "plugin:1"), links, NOW).to_dict()
     b = build_case_file(case_by_id(cases, "plugin:1"), links, NOW).to_dict()
     assert a == b and a["disposition"] is None
-    assert {"case_id", "score", "facts", "fixes", "hosts", "vulnerabilities", "timeline", "limitations",
-            "evidence_ids", "facts_summary"} <= set(a)
+    assert {
+        "case_id",
+        "score",
+        "facts",
+        "fixes",
+        "hosts",
+        "vulnerabilities",
+        "timeline",
+        "limitations",
+        "evidence_ids",
+        "facts_summary",
+    } <= set(a)
 
 
 def test_facts_summary_lines_are_plain_statements(world):
@@ -105,6 +123,7 @@ def test_facts_summary_lines_are_plain_statements(world):
 
 
 # --- package view ---
+
 
 def test_package_view_has_priority_and_cases_relieved(world):
     _, _, packages, links = world

@@ -98,18 +98,31 @@ def test_age_never_negative_when_as_of_precedes_first_found():
 
 
 def test_unsupported_recurrence_and_patch_flags():
-    comps, _ = components([
-        finding("f1", unsupported_by_vendor=True, has_patch=True, state="REOPENED"),
-        finding("f2", asset="a2", state="REOPENED"),
-    ])
+    comps, _ = components(
+        [
+            finding("f1", unsupported_by_vendor=True, has_patch=True, state="REOPENED"),
+            finding("f2", asset="a2", state="REOPENED"),
+        ]
+    )
     assert comps["unsupported"].raw == 1.0
     assert comps["patch"].raw == 1.0
     assert comps["recurrence"].raw == pytest.approx(2 / 5)
 
 
 def test_total_is_sum_of_points_and_within_bounds():
-    _, s = components([finding("f1", severity="critical", exploited_by_malware=True, unsupported_by_vendor=True,
-                               has_patch=True, state="REOPENED")], as_of=datetime(2030, 1, 1, tzinfo=timezone.utc))
+    _, s = components(
+        [
+            finding(
+                "f1",
+                severity="critical",
+                exploited_by_malware=True,
+                unsupported_by_vendor=True,
+                has_patch=True,
+                state="REOPENED",
+            )
+        ],
+        as_of=datetime(2030, 1, 1, tzinfo=timezone.utc),
+    )
     assert s.total == pytest.approx(sum(c.points for c in s.components))
     assert 0 < s.total <= 100
 
@@ -123,12 +136,21 @@ def test_every_component_has_a_human_readable_detail():
 def test_score_to_dict_is_json_ready():
     _, s = components([finding("f1")])
     d = s.to_dict()
-    assert set(d) == {"total", "components"} and d["components"][0].keys() >= {"name", "weight", "raw", "points", "detail"}
+    assert set(d) == {"total", "components"} and d["components"][0].keys() >= {
+        "name",
+        "weight",
+        "raw",
+        "points",
+        "detail",
+    }
 
 
 def test_rank_orders_by_score_then_id_and_numbers_from_one():
-    recs = [finding("f1", plugin=2, severity="low"), finding("f2", plugin=1, severity="critical"),
-            finding("f3", plugin=3, severity="low")]
+    recs = [
+        finding("f1", plugin=2, severity="low"),
+        finding("f2", plugin=1, severity="critical"),
+        finding("f3", plugin=3, severity="low"),
+    ]
     ranked = rank_clusters(build_clusters(recs), 100, NOW)
     assert [r.cluster.cluster_id for r in ranked] == ["plugin:1", "plugin:2", "plugin:3"]
     assert [r.rank for r in ranked] == [1, 2, 3]
@@ -142,7 +164,11 @@ def test_rank_is_independent_of_input_order():
 
 
 def test_fleet_size_counts_distinct_assets_including_info_and_fixed():
-    recs = [finding("f1", asset="a1", severity="info"), finding("f2", asset="a2", state="FIXED"), finding("f3", asset="a2")]
+    recs = [
+        finding("f1", asset="a1", severity="info"),
+        finding("f2", asset="a2", state="FIXED"),
+        finding("f3", asset="a2"),
+    ]
     assert fleet_size(recs) == 2
 
 

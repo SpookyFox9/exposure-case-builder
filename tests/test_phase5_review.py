@@ -13,8 +13,15 @@ from exposure_case.service import ServiceError, Workspace
 SAMPLE = Path(__file__).resolve().parent.parent / "data" / "sample"
 AS_OF = datetime(2026, 11, 2, tzinfo=timezone.utc)
 T0 = datetime(2026, 11, 3, tzinfo=timezone.utc)
-GOOD = {"item_id": "plugin:1", "kind": "case", "analyst": "a", "disposition": "assigned", "note": "n",
-        "recorded_at": "2026-11-03T00:00:00+00:00", "data_as_of": "2026-11-02T00:00:00+00:00"}
+GOOD = {
+    "item_id": "plugin:1",
+    "kind": "case",
+    "analyst": "a",
+    "disposition": "assigned",
+    "note": "n",
+    "recorded_at": "2026-11-03T00:00:00+00:00",
+    "data_as_of": "2026-11-02T00:00:00+00:00",
+}
 
 
 @pytest.fixture
@@ -32,10 +39,18 @@ def first_case(ws):
 
 # --- the log must not be a single point of failure ---
 
+
 def test_lenient_read_skips_bad_lines_and_reports_them(tmp_path):
     path = tmp_path / "d.jsonl"
-    write_log(path, json.dumps(GOOD), "not json", json.dumps({**GOOD, "item_id": ["x"]}), "[" * 100000,
-              json.dumps({**GOOD, "note": 5}), json.dumps({**GOOD, "item_id": "plugin:2"}))
+    write_log(
+        path,
+        json.dumps(GOOD),
+        "not json",
+        json.dumps({**GOOD, "item_id": ["x"]}),
+        "[" * 100000,
+        json.dumps({**GOOD, "note": 5}),
+        json.dumps({**GOOD, "item_id": "plugin:2"}),
+    )
     entries, bad = dlog.read_dispositions_lenient(path)
     assert [e.item_id for e in entries] == ["plugin:1", "plugin:2"] and bad == (2, 3, 4, 5)
 
@@ -60,8 +75,17 @@ def test_log_is_bounded(tmp_path, monkeypatch):
     path = tmp_path / "d.jsonl"
     with pytest.raises(dlog.DispositionError, match="full"):
         for _ in range(50):
-            dlog.record_disposition(path, item_id="plugin:1", kind="case", analyst="a", disposition="assigned",
-                                    note="n" * 100, confirm=True, data_as_of=AS_OF, clock=lambda: T0)
+            dlog.record_disposition(
+                path,
+                item_id="plugin:1",
+                kind="case",
+                analyst="a",
+                disposition="assigned",
+                note="n" * 100,
+                confirm=True,
+                data_as_of=AS_OF,
+                clock=lambda: T0,
+            )
     assert path.stat().st_size < 1200
 
 
@@ -84,6 +108,7 @@ def test_log_reads_are_cached_until_the_file_changes(ws, tmp_path, monkeypatch):
 
 
 # --- cost and size ---
+
 
 def test_case_files_and_packages_are_built_once(ws, monkeypatch):
     built = {"case": 0, "package": 0}
@@ -134,6 +159,7 @@ def test_vulnerability_limit_is_lower_than_other_lists(ws):
 
 # --- no absolute paths reach the model ---
 
+
 def test_written_exports_are_reported_by_name_only(ws, tmp_path):
     out = ws.export(first_case(ws), "markdown", write=True, confirm=True)
     assert out["written"] and all("/" not in n and "\\" not in n for n in out["written"])
@@ -142,6 +168,7 @@ def test_written_exports_are_reported_by_name_only(ws, tmp_path):
 
 
 # --- honest wording ---
+
 
 def test_confirm_errors_do_not_claim_to_verify_a_human(ws):
     with pytest.raises(ServiceError) as exc:

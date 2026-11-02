@@ -17,8 +17,16 @@ T0 = datetime(2026, 11, 3, 9, 0, tzinfo=timezone.utc)
 
 
 def rec(path, **overrides):
-    args = {"item_id": "plugin:1", "kind": "case", "analyst": "analyst-1", "disposition": "assigned",
-                "note": "Sent to the platform team.", "confirm": True, "data_as_of": AS_OF, "clock": lambda: T0}
+    args = {
+        "item_id": "plugin:1",
+        "kind": "case",
+        "analyst": "analyst-1",
+        "disposition": "assigned",
+        "note": "Sent to the platform team.",
+        "confirm": True,
+        "data_as_of": AS_OF,
+        "clock": lambda: T0,
+    }
     return record_disposition(path, **{**args, **overrides})
 
 
@@ -41,9 +49,15 @@ def test_appends_one_json_line_with_all_fields(tmp_path):
     lines = path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     data = json.loads(lines[0])
-    assert data == {"item_id": "plugin:1", "kind": "case", "analyst": "analyst-1", "disposition": "assigned",
-                    "note": "Sent to the platform team.", "recorded_at": "2026-11-03T09:00:00+00:00",
-                    "data_as_of": "2026-11-02T00:00:00+00:00"}
+    assert data == {
+        "item_id": "plugin:1",
+        "kind": "case",
+        "analyst": "analyst-1",
+        "disposition": "assigned",
+        "note": "Sent to the platform team.",
+        "recorded_at": "2026-11-03T09:00:00+00:00",
+        "data_as_of": "2026-11-02T00:00:00+00:00",
+    }
 
 
 def test_log_is_append_only(tmp_path):

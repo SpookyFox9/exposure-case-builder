@@ -27,8 +27,12 @@ def data(result):
 
 
 async def scenario(tmp_path: Path) -> dict:
-    env = {**os.environ, "EXPOSURE_CASE_DATA": str(SAMPLE), "EXPOSURE_CASE_EXPORTS": str(tmp_path / "exports"),
-           "EXPOSURE_CASE_DISPOSITIONS": str(tmp_path / "d.jsonl")}
+    env = {
+        **os.environ,
+        "EXPOSURE_CASE_DATA": str(SAMPLE),
+        "EXPOSURE_CASE_EXPORTS": str(tmp_path / "exports"),
+        "EXPOSURE_CASE_DISPOSITIONS": str(tmp_path / "d.jsonl"),
+    }
     params = StdioServerParameters(command=sys.executable, args=["-m", "exposure_case.server"], env=env)
     out: dict = {}
     async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
@@ -56,18 +60,32 @@ async def scenario(tmp_path: Path) -> dict:
 
         out["confirm_string"] = await session.call_tool(
             "record_disposition",
-            {"item_id": case_id, "analyst": "a", "disposition": "assigned", "note": "n", "confirm": "true"})
+            {"item_id": case_id, "analyst": "a", "disposition": "assigned", "note": "n", "confirm": "true"},
+        )
         out["confirm_int"] = await session.call_tool(
             "record_disposition",
-            {"item_id": case_id, "analyst": "a", "disposition": "assigned", "note": "n", "confirm": 1})
+            {"item_id": case_id, "analyst": "a", "disposition": "assigned", "note": "n", "confirm": 1},
+        )
         out["write_string"] = await session.call_tool("export", {"item_id": case_id, "write": "yes", "confirm": True})
         out["disp_no_confirm"] = await session.call_tool(
-            "record_disposition", {"item_id": case_id, "analyst": "analyst-1", "disposition": "assigned", "note": "n"})
+            "record_disposition", {"item_id": case_id, "analyst": "analyst-1", "disposition": "assigned", "note": "n"}
+        )
         out["disp_bad_value"] = await session.call_tool(
-            "record_disposition", {"item_id": case_id, "analyst": "a", "disposition": "fired", "note": "n", "confirm": True})
-        out["disp_ok"] = data(await session.call_tool(
             "record_disposition",
-            {"item_id": case_id, "analyst": "analyst-1", "disposition": "assigned", "note": "ticket opened", "confirm": True}))
+            {"item_id": case_id, "analyst": "a", "disposition": "fired", "note": "n", "confirm": True},
+        )
+        out["disp_ok"] = data(
+            await session.call_tool(
+                "record_disposition",
+                {
+                    "item_id": case_id,
+                    "analyst": "analyst-1",
+                    "disposition": "assigned",
+                    "note": "ticket opened",
+                    "confirm": True,
+                },
+            )
+        )
         out["after_hide"] = data(await session.call_tool("case_queue", {"top_n": 50, "hide_dispositioned": True}))
         out["after_case"] = data(await session.call_tool("case_file", {"case_id": case_id}))
     return out
@@ -171,15 +189,25 @@ def test_disposition_is_logged_and_visible_afterwards(run):
 
 def test_server_refuses_to_start_without_data(tmp_path):
     proc = subprocess.run(
-        [sys.executable, "-m", "exposure_case.server"], capture_output=True, text=True, timeout=60, check=False,
-        env={k: v for k, v in os.environ.items() if k != "EXPOSURE_CASE_DATA"})
+        [sys.executable, "-m", "exposure_case.server"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        env={k: v for k, v in os.environ.items() if k != "EXPOSURE_CASE_DATA"},
+    )
     assert proc.returncode == 1 and proc.stdout == "" and "EXPOSURE_CASE_DATA" in proc.stderr
 
 
 def test_server_refuses_a_missing_data_directory(tmp_path):
     proc = subprocess.run(
-        [sys.executable, "-m", "exposure_case.server"], capture_output=True, text=True, timeout=60, check=False,
-        env={**os.environ, "EXPOSURE_CASE_DATA": str(tmp_path / "nope")})
+        [sys.executable, "-m", "exposure_case.server"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        env={**os.environ, "EXPOSURE_CASE_DATA": str(tmp_path / "nope")},
+    )
     assert proc.returncode == 1 and proc.stdout == "" and "not found" in proc.stderr
 
 
@@ -197,7 +225,11 @@ def test_enum_arguments_show_their_values_in_the_schema(run):
     assert set(prop("case_queue", "kind")["enum"]) == {"both", "threats", "backlogs"}
     assert set(prop("export", "format")["enum"]) == {"markdown", "hosts_csv", "actions_csv", "json"}
     assert set(prop("record_disposition", "disposition")["enum"]) == {
-        "assigned", "risk-accepted", "false-positive", "needs-info"}
+        "assigned",
+        "risk-accepted",
+        "false-positive",
+        "needs-info",
+    }
 
 
 def test_instructions_treat_tool_text_as_data_and_admit_the_confirm_limit(run):

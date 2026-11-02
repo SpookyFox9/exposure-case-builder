@@ -63,5 +63,13 @@ def test_no_signal_at_all():
 
 
 def test_weights_are_unchanged():
-    assert dict(WEIGHTS) == {"severity": 30, "exploit": 25, "breadth": 15, "volume": 10,
-                             "age": 5, "unsupported": 5, "recurrence": 5, "patch": 5}
+    assert dict(WEIGHTS) == {
+        "severity": 30,
+        "exploit": 25,
+        "breadth": 15,
+        "volume": 10,
+        "age": 5,
+        "unsupported": 5,
+        "recurrence": 5,
+        "patch": 5,
+    }

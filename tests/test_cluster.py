@@ -46,10 +46,13 @@ def test_plugin_findings_group_into_one_cluster_across_assets():
 
 def test_patch_family_plugins_merge_into_one_family_cluster():
     fam = "Red Hat Local Security Checks"
-    cs = build_clusters([
-        finding("f1", plugin=1, family=fam), finding("f2", plugin=2, family=fam, asset="a2"),
-        finding("f3", plugin=3, family="General"),
-    ])
+    cs = build_clusters(
+        [
+            finding("f1", plugin=1, family=fam),
+            finding("f2", plugin=2, family=fam, asset="a2"),
+            finding("f3", plugin=3, family="General"),
+        ]
+    )
     by_id = {c.cluster_id: c for c in cs}
     assert set(by_id) == {"family:red-hat-local-security-checks", "plugin:3"}
     family = by_id["family:red-hat-local-security-checks"]

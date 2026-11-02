@@ -15,8 +15,9 @@ SSH = "cpe:/a:openbsd:openssh"
 
 
 def fx(fid, asset="a1", plugin=1, solution="Upgrade to OpenSSH 9.6 or later.", cpe=SSH, severity="high", **extra):
-    return finding(fid, plugin=plugin, asset=asset, severity=severity, solution=solution,
-                   cpe=[cpe] if cpe else [], **extra)
+    return finding(
+        fid, plugin=plugin, asset=asset, severity=severity, solution=solution, cpe=[cpe] if cpe else [], **extra
+    )
 
 
 def by_id(packages):
@@ -24,6 +25,7 @@ def by_id(packages):
 
 
 # --- helpers ---
+
 
 @pytest.mark.parametrize(
     "cpe,expected",
@@ -69,8 +71,11 @@ def test_classify_fix(solution, expected):
 
 # --- grouping ---
 
+
 def test_same_product_and_fix_type_share_one_package():
-    ps = build_fix_packages([fx("f1", plugin=1), fx("f2", plugin=2, asset="a2"), fx("f3", plugin=3, cpe="cpe:/a:v:other")])
+    ps = build_fix_packages(
+        [fx("f1", plugin=1), fx("f2", plugin=2, asset="a2"), fx("f3", plugin=3, cpe="cpe:/a:v:other")]
+    )
     ids = by_id(ps)
     assert set(ids) == {"fix:openbsd-openssh:patch", "fix:v-other:patch"}
     ssh = ids["fix:openbsd-openssh:patch"]
@@ -79,10 +84,14 @@ def test_same_product_and_fix_type_share_one_package():
 
 
 def test_patch_and_configuration_fixes_for_one_product_stay_separate():
-    ps = by_id(build_fix_packages([
-        fx("f1", plugin=1),
-        fx("f2", plugin=2, solution="Contact the vendor to disable CBC mode ciphers."),
-    ]))
+    ps = by_id(
+        build_fix_packages(
+            [
+                fx("f1", plugin=1),
+                fx("f2", plugin=2, solution="Contact the vendor to disable CBC mode ciphers."),
+            ]
+        )
+    )
     assert set(ps) == {"fix:openbsd-openssh:patch", "fix:openbsd-openssh:configuration"}
 
 
@@ -92,7 +101,9 @@ def test_no_cpe_falls_back_to_the_plugin():
 
 
 def test_cpe_aliases_merge_into_one_package():
-    ps = build_fix_packages([fx("f1", plugin=1, cpe="cpe:/a:centos:centos"), fx("f2", plugin=2, cpe="cpe:/o:centos:centos")])
+    ps = build_fix_packages(
+        [fx("f1", plugin=1, cpe="cpe:/a:centos:centos"), fx("f2", plugin=2, cpe="cpe:/o:centos:centos")]
+    )
     assert [p.package_id for p in ps] == ["fix:centos-centos:patch"]
 
 
@@ -113,30 +124,41 @@ def test_every_active_finding_lands_in_exactly_one_package():
 
 
 def test_packages_are_sorted_and_deterministic():
-    recs = [fx("f1", plugin=1, cpe="cpe:/a:z:z"), fx("f2", plugin=2, cpe="cpe:/a:a:a"), fx("f3", plugin=3, cpe="cpe:/a:m:m")]
+    recs = [
+        fx("f1", plugin=1, cpe="cpe:/a:z:z"),
+        fx("f2", plugin=2, cpe="cpe:/a:a:a"),
+        fx("f3", plugin=3, cpe="cpe:/a:m:m"),
+    ]
     a = [p.package_id for p in build_fix_packages(recs)]
     assert a == sorted(a) == [p.package_id for p in build_fix_packages(list(reversed(recs)))]
 
 
 # --- contents ---
 
+
 def test_actions_list_distinct_solutions_with_counts_largest_first():
-    ps = build_fix_packages([
-        fx("f1", plugin=1, solution="Upgrade to OpenSSH 9.6."),
-        fx("f2", plugin=2, asset="a2", solution="Upgrade to OpenSSH 9.6."),
-        fx("f3", plugin=3, solution="Upgrade to OpenSSH 9.8."),
-    ])
+    ps = build_fix_packages(
+        [
+            fx("f1", plugin=1, solution="Upgrade to OpenSSH 9.6."),
+            fx("f2", plugin=2, asset="a2", solution="Upgrade to OpenSSH 9.6."),
+            fx("f3", plugin=3, solution="Upgrade to OpenSSH 9.8."),
+        ]
+    )
     acts = ps[0].actions
     assert [(a.solution, a.plugins, a.findings, a.hosts) for a in acts] == [
-        ("Upgrade to OpenSSH 9.6.", 2, 2, 2), ("Upgrade to OpenSSH 9.8.", 1, 1, 1)]
+        ("Upgrade to OpenSSH 9.6.", 2, 2, 2),
+        ("Upgrade to OpenSSH 9.8.", 1, 1, 1),
+    ]
 
 
 def test_host_table_summarises_each_host():
-    ps = build_fix_packages([
-        fx("f1", plugin=1, asset="a1", severity="low"),
-        fx("f2", plugin=2, asset="a1", severity="critical"),
-        fx("f3", plugin=3, asset="a2", severity="medium"),
-    ])
+    ps = build_fix_packages(
+        [
+            fx("f1", plugin=1, asset="a1", severity="low"),
+            fx("f2", plugin=2, asset="a1", severity="critical"),
+            fx("f3", plugin=3, asset="a2", severity="medium"),
+        ]
+    )
     hosts = {h.asset_uuid: h for h in ps[0].hosts}
     assert (hosts["a1"].findings, hosts["a1"].plugins, hosts["a1"].worst_severity) == (2, 2, "critical")
     assert hosts["a2"].worst_severity == "medium"
@@ -144,9 +166,12 @@ def test_host_table_summarises_each_host():
 
 
 def test_impact_counts_and_fleet_share():
-    recs = [fx("f1", plugin=1, asset="a1", severity="critical"), fx("f2", plugin=2, asset="a2", severity="critical"),
-            fx("f3", plugin=3, asset="a3", severity="high", cpe="cpe:/a:o:o"),
-            fx("f4", plugin=4, asset="a4", severity="critical", cpe="cpe:/a:o:o")]
+    recs = [
+        fx("f1", plugin=1, asset="a1", severity="critical"),
+        fx("f2", plugin=2, asset="a2", severity="critical"),
+        fx("f3", plugin=3, asset="a3", severity="high", cpe="cpe:/a:o:o"),
+        fx("f4", plugin=4, asset="a4", severity="critical", cpe="cpe:/a:o:o"),
+    ]
     pk = by_id(build_fix_packages(recs))
     ssh = pk["fix:openbsd-openssh:patch"].impact
     assert (ssh.plugins, ssh.findings, ssh.hosts) == (2, 2, 2)
@@ -156,19 +181,23 @@ def test_impact_counts_and_fleet_share():
 
 def test_impact_exploitability_signals():
     # the shared record helper defaults exploit_available to True, so set it explicitly
-    recs = [fx("f1", plugin=1, exploit_available=True),
-            fx("f2", plugin=2, exploit_available=False, exploited_by_malware=True),
-            fx("f3", plugin=3, exploit_available=False, vpr={"on_cisa_kev": True}),
-            fx("f4", plugin=4, exploit_available=False)]
+    recs = [
+        fx("f1", plugin=1, exploit_available=True),
+        fx("f2", plugin=2, exploit_available=False, exploited_by_malware=True),
+        fx("f3", plugin=3, exploit_available=False, vpr={"on_cisa_kev": True}),
+        fx("f4", plugin=4, exploit_available=False),
+    ]
     imp = build_fix_packages(recs)[0].impact
     assert (imp.exploitable_findings, imp.malware_findings, imp.kev_findings) == (1, 1, 1)
 
 
 def test_references_are_unique_and_sorted():
-    ps = build_fix_packages([
-        fx("f1", plugin=1, cve=["CVE-2", "CVE-1"], see_also=["https://b.test", "https://a.test"]),
-        fx("f2", plugin=2, asset="a2", cve=["CVE-1"], see_also=["https://a.test"]),
-    ])
+    ps = build_fix_packages(
+        [
+            fx("f1", plugin=1, cve=["CVE-2", "CVE-1"], see_also=["https://b.test", "https://a.test"]),
+            fx("f2", plugin=2, asset="a2", cve=["CVE-1"], see_also=["https://a.test"]),
+        ]
+    )
     assert ps[0].cves == ("CVE-1", "CVE-2") and ps[0].advisories == ("https://a.test", "https://b.test")
 
 

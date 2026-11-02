@@ -50,8 +50,12 @@ class Reconciliation:
             "export_below_workbench": self.export_below_workbench,
             "export_above_workbench": self.export_above_workbench,
             "largest_gaps": [
-                {"plugin_id": m.plugin_id, "export_assets": m.export_assets,
-                 "export_findings": m.export_findings, "workbench_count": m.workbench_count}
+                {
+                    "plugin_id": m.plugin_id,
+                    "export_assets": m.export_assets,
+                    "export_findings": m.export_findings,
+                    "workbench_count": m.workbench_count,
+                }
                 for m in sorted(self.mismatches, key=lambda m: -(m.workbench_count - m.export_findings))[:10]
             ],
         }
@@ -79,5 +83,10 @@ def reconcile(records: Iterable[FindingRecord], plugin_info: Mapping[int, Plugin
             instances_only += 1
         else:
             mismatches.append(Mismatch(plugin_id, len(hosts[plugin_id]), instances[plugin_id], info.count))
-    return Reconciliation(compared=exact + len(mismatches), exact=exact, instances_only=instances_only,
-                          not_in_workbench=missing, mismatches=tuple(mismatches))
+    return Reconciliation(
+        compared=exact + len(mismatches),
+        exact=exact,
+        instances_only=instances_only,
+        not_in_workbench=missing,
+        mismatches=tuple(mismatches),
+    )

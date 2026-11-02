@@ -21,10 +21,25 @@ def rec(fid, asset, plugin, severity="high", state="OPEN", output="x" * 500, **p
         "last_found": "2026-11-01T00:00:00.000Z",
         "output": output,
         "indexed": "drop-me",
-        "asset": {"uuid": asset, "hostname": f"H-{asset}", "ipv4": "10.0.0.1", "device_type": "general-purpose",
-                  "operating_system": ["Linux"], "network_id": "drop-me"},
-        "plugin": {"id": plugin, "name": f"P{plugin}", "family": "F", "synopsis": "s", "description": "drop " * 200,
-                   "exploit_available": True, "has_patch": True, "xrefs": [1, 2, 3], **plugin_extra},
+        "asset": {
+            "uuid": asset,
+            "hostname": f"H-{asset}",
+            "ipv4": "10.0.0.1",
+            "device_type": "general-purpose",
+            "operating_system": ["Linux"],
+            "network_id": "drop-me",
+        },
+        "plugin": {
+            "id": plugin,
+            "name": f"P{plugin}",
+            "family": "F",
+            "synopsis": "s",
+            "description": "drop " * 200,
+            "exploit_available": True,
+            "has_patch": True,
+            "xrefs": [1, 2, 3],
+            **plugin_extra,
+        },
         "port": {"port": 22, "protocol": "TCP", "service": "ssh"},
         "scan": {"uuid": "s1", "started_at": "2026-11-01T00:00:00.000Z"},
     }
@@ -46,7 +61,9 @@ def source(tmp_path):
     records.append(rec("x-1", "asset-2", 300))
     (src / "chunks" / "chunk_1.json").write_text(json.dumps(records), encoding="utf-8")
     (src / "plugins.json").write_text(
-        json.dumps({"vulnerabilities": [{"plugin_id": 100, "count": 6, "vpr_score": 5.0}, {"plugin_id": 555, "count": 1}]}),
+        json.dumps(
+            {"vulnerabilities": [{"plugin_id": 100, "count": 6, "vpr_score": 5.0}, {"plugin_id": 555, "count": 1}]}
+        ),
         encoding="utf-8",
     )
     return src
@@ -79,7 +96,9 @@ def test_info_findings_never_kept(source, tmp_path):
 def test_sample_is_deterministic(source, tmp_path):
     ms.build_sample(source, tmp_path / "a", n_plugins=2, n_notable=1)
     ms.build_sample(source, tmp_path / "b", n_plugins=2, n_notable=1)
-    assert (tmp_path / "a" / "chunks" / "chunk_1.json").read_bytes() == (tmp_path / "b" / "chunks" / "chunk_1.json").read_bytes()
+    assert (tmp_path / "a" / "chunks" / "chunk_1.json").read_bytes() == (
+        tmp_path / "b" / "chunks" / "chunk_1.json"
+    ).read_bytes()
 
 
 def test_sample_strips_unused_fields_and_truncates_output(source, tmp_path):

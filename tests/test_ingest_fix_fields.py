@@ -24,16 +24,18 @@ def test_defaults_when_fields_absent():
 
 
 def test_solution_references_and_product_fields():
-    r = rec({
-        "solution": "  Upgrade to OpenSSH 9.6 or later.  ",
-        "see_also": ["https://example.test/a", "https://example.test/b"],
-        "cve": ["CVE-2023-48795"],
-        "cpe": ["cpe:/a:openbsd:openssh"],
-        "has_workaround": True,
-        "cvss3_base_score": 5.9,
-        "epss_score": 1.163,
-        "patch_publication_date": "2023-12-18T00:00:00Z",
-    })
+    r = rec(
+        {
+            "solution": "  Upgrade to OpenSSH 9.6 or later.  ",
+            "see_also": ["https://example.test/a", "https://example.test/b"],
+            "cve": ["CVE-2023-48795"],
+            "cpe": ["cpe:/a:openbsd:openssh"],
+            "has_workaround": True,
+            "cvss3_base_score": 5.9,
+            "epss_score": 1.163,
+            "patch_publication_date": "2023-12-18T00:00:00Z",
+        }
+    )
     assert r.solution == "Upgrade to OpenSSH 9.6 or later."
     assert r.see_also == ("https://example.test/a", "https://example.test/b")
     assert r.cves == ("CVE-2023-48795",) and r.cpe == ("cpe:/a:openbsd:openssh",)
@@ -47,8 +49,12 @@ def test_vpr_object_is_flattened():
 
 
 def test_finding_level_fix_dates():
-    r = rec(None, last_fixed="2026-10-25T09:03:01.280Z", resurfaced_date="2026-09-27T08:44:13.944Z",
-            time_taken_to_fix=600932)
+    r = rec(
+        None,
+        last_fixed="2026-10-25T09:03:01.280Z",
+        resurfaced_date="2026-09-27T08:44:13.944Z",
+        time_taken_to_fix=600932,
+    )
     assert r.last_fixed.year == 2026 and r.resurfaced.month == 9
     assert r.fix_seconds == 600932
 
@@ -56,9 +62,17 @@ def test_finding_level_fix_dates():
 @pytest.mark.parametrize(
     "plugin_extra",
     [
-        {"solution": {"a": 1}}, {"solution": 5}, {"see_also": "https://x.test"}, {"cve": "CVE-1"},
-        {"cpe": [1, None, {"x": 1}]}, {"vpr": "high"}, {"vpr": ["x"]}, {"epss_score": "high"},
-        {"cvss3_base_score": True}, {"patch_publication_date": "nonsense"}, {"has_workaround": "yes"},
+        {"solution": {"a": 1}},
+        {"solution": 5},
+        {"see_also": "https://x.test"},
+        {"cve": "CVE-1"},
+        {"cpe": [1, None, {"x": 1}]},
+        {"vpr": "high"},
+        {"vpr": ["x"]},
+        {"epss_score": "high"},
+        {"cvss3_base_score": True},
+        {"patch_publication_date": "nonsense"},
+        {"has_workaround": "yes"},
     ],
 )
 def test_malformed_optional_fields_fall_back_to_defaults_without_raising(plugin_extra):
@@ -82,6 +96,7 @@ def test_bad_fix_seconds_become_none(bad):
 def test_bad_optional_timestamps_become_none_but_required_ones_still_raise():
     assert rec(None, last_fixed="garbage", resurfaced_date=7).last_fixed is None
     from exposure_case.ingest import IngestError
+
     with pytest.raises(IngestError):
         parse_record(raw_record(first_found="garbage"))
 

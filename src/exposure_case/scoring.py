@@ -18,14 +18,14 @@ from .ingest import FindingRecord
 
 # (component, weight). Single source of truth; documented in docs/PLAN.md.
 WEIGHTS: tuple[tuple[str, int], ...] = (
-    ("severity", 30),     # worst active severity
-    ("exploit", 25),      # known exploitation / exploit availability
-    ("breadth", 15),      # how many hosts are affected (log scale)
-    ("volume", 10),       # how many distinct vulnerabilities the case covers (log scale)
-    ("age", 5),           # how long the oldest active finding has been open
-    ("unsupported", 5),   # vendor no longer supports the product
-    ("recurrence", 5),    # findings that came back after being fixed
-    ("patch", 5),         # a patch exists, so the fix is actionable
+    ("severity", 30),  # worst active severity
+    ("exploit", 25),  # known exploitation / exploit availability
+    ("breadth", 15),  # how many hosts are affected (log scale)
+    ("volume", 10),  # how many distinct vulnerabilities the case covers (log scale)
+    ("age", 5),  # how long the oldest active finding has been open
+    ("unsupported", 5),  # vendor no longer supports the product
+    ("recurrence", 5),  # findings that came back after being fixed
+    ("patch", 5),  # a patch exists, so the fix is actionable
 )
 SEVERITY_SCALE = {"critical": 1.0, "high": 0.75, "medium": 0.4, "low": 0.1, "info": 0.0}
 EXPLOIT_KEV = 1.0  # on the CISA Known Exploited Vulnerabilities list
@@ -53,8 +53,13 @@ class ScoreComponent:
         return self.weight * self.raw
 
     def to_dict(self) -> dict:
-        return {"name": self.name, "weight": self.weight, "raw": round(self.raw, 4),
-                "points": round(self.points, 2), "detail": self.detail}
+        return {
+            "name": self.name,
+            "weight": self.weight,
+            "raw": round(self.raw, 4),
+            "points": round(self.points, 2),
+            "detail": self.detail,
+        }
 
 
 @dataclass(frozen=True)
@@ -119,7 +124,9 @@ def _exploit(c: Cluster) -> ScoreComponent:
 def _breadth(c: Cluster, fleet: int) -> ScoreComponent:
     n = c.asset_count
     denominator = math.log1p(max(fleet, n, 1))
-    return ScoreComponent("breadth", 15, min(1.0, math.log1p(n) / denominator), f"{n} of {max(fleet, n)} hosts affected")
+    return ScoreComponent(
+        "breadth", 15, min(1.0, math.log1p(n) / denominator), f"{n} of {max(fleet, n)} hosts affected"
+    )
 
 
 def _finding(n: int) -> str:
@@ -129,12 +136,16 @@ def _finding(n: int) -> str:
 def _volume(c: Cluster) -> ScoreComponent:
     n = len(c.plugin_ids)
     raw = min(1.0, math.log1p(n) / math.log1p(VOLUME_SATURATION))
-    return ScoreComponent("volume", 10, raw, f"{n} distinct {'vulnerability' if n == 1 else 'vulnerabilities'}, {_finding(len(c.active))}")
+    return ScoreComponent(
+        "volume", 10, raw, f"{n} distinct {'vulnerability' if n == 1 else 'vulnerabilities'}, {_finding(len(c.active))}"
+    )
 
 
 def _age(c: Cluster, as_of: datetime) -> ScoreComponent:
     days = max(0, (as_of - min(r.first_found for r in c.active)).days)
-    return ScoreComponent("age", 5, min(1.0, days / AGE_SATURATION_DAYS), f"oldest active finding first seen {days} days ago")
+    return ScoreComponent(
+        "age", 5, min(1.0, days / AGE_SATURATION_DAYS), f"oldest active finding first seen {days} days ago"
+    )
 
 
 def _unsupported(c: Cluster) -> ScoreComponent:

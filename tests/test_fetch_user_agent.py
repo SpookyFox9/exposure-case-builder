@@ -42,7 +42,8 @@ def test_hostile_or_empty_vendor_cannot_break_the_header(monkeypatch, hostile):
 
 def test_explicit_arguments_override_the_defaults():
     assert ft.user_agent(vendor="ACME Industries", product="FancyIntegration", build="1.2.3") == (
-        "Integration/1.0 (ACME Industries; FancyIntegration; Build/1.2.3)")
+        "Integration/1.0 (ACME Industries; FancyIntegration; Build/1.2.3)"
+    )
 
 
 def test_odd_build_strings_are_reduced_to_safe_characters():

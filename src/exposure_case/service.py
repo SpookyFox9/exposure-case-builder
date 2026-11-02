@@ -71,8 +71,9 @@ def _worst(by_severity: dict[str, int]) -> str:
 class Workspace:
     """One loaded export with its cases, fix packages, links and rankings."""
 
-    def __init__(self, records: tuple[FindingRecord, ...], plugin_info: dict, exports_dir: Path,
-                 dispositions_path: Path) -> None:
+    def __init__(
+        self, records: tuple[FindingRecord, ...], plugin_info: dict, exports_dir: Path, dispositions_path: Path
+    ) -> None:
         self.records = records
         self.exports_dir = Path(exports_dir)
         self.dispositions_path = Path(dispositions_path)
@@ -172,10 +173,12 @@ class Workspace:
         if warnings:
             summary["log_warnings"] = warnings
             summary["notes"].append(
-                f"{warnings} unreadable line(s) in the disposition log were skipped; see EXPOSURE_CASE_DISPOSITIONS.")
+                f"{warnings} unreadable line(s) in the disposition log were skipped; see EXPOSURE_CASE_DISPOSITIONS."
+            )
         if self._reconciliation:
-            summary["data_quality"] = {k: self._reconciliation[k] for k in
-                                       ("compared", "exact", "mismatch_count", "not_in_workbench")}
+            summary["data_quality"] = {
+                k: self._reconciliation[k] for k in ("compared", "exact", "mismatch_count", "not_in_workbench")
+            }
         return summary
 
     def _case_row(self, ranked: RankedCluster, position: int, latest: dict) -> dict:
@@ -183,10 +186,18 @@ class Workspace:
         facts = case_facts(list(case.active), self.as_of)
         entry = latest.get(case.cluster_id)
         return {
-            "position": position, "rank": ranked.rank, "case_id": case.cluster_id, "title": case.title,
-            "kind": case.kind, "score": round(ranked.score.total, 1), "worst_severity": _worst(facts["by_severity"]),
-            "hosts": facts["hosts"], "vulnerabilities": facts["vulnerabilities"], "findings": facts["findings"],
-            "kev_findings": facts["kev_findings"], "why": list(priority_reasons(ranked.score)),
+            "position": position,
+            "rank": ranked.rank,
+            "case_id": case.cluster_id,
+            "title": case.title,
+            "kind": case.kind,
+            "score": round(ranked.score.total, 1),
+            "worst_severity": _worst(facts["by_severity"]),
+            "hosts": facts["hosts"],
+            "vulnerabilities": facts["vulnerabilities"],
+            "findings": facts["findings"],
+            "kev_findings": facts["kev_findings"],
+            "why": list(priority_reasons(ranked.score)),
             "fix_packages": [link.other_id for link in self.links.fixes_for(case.cluster_id)[:3]],
             "disposition": entry.to_dict() if entry else None,
         }
@@ -198,8 +209,11 @@ class Workspace:
         latest = self._latest()
 
         def rows(case_kind: str) -> list[dict]:
-            chosen = [r for r in self.ranked_cases if r.cluster.kind == case_kind
-                      and not (hide_dispositioned and r.cluster.cluster_id in latest)][:top_n]
+            chosen = [
+                r
+                for r in self.ranked_cases
+                if r.cluster.kind == case_kind and not (hide_dispositioned and r.cluster.cluster_id in latest)
+            ][:top_n]
             return [self._case_row(r, i, latest) for i, r in enumerate(chosen, start=1)]
 
         if kind == "both":
@@ -209,20 +223,32 @@ class Workspace:
     def fix_queue(self, top_n: int = 10, hide_dispositioned: bool = False) -> dict:
         top_n = _int(top_n, "top_n", 1, MAX_TOP_N)
         latest = self._latest()
-        chosen = [r for r in self.ranked_packages
-                  if not (hide_dispositioned and r.package.package_id in latest)][:top_n]
+        chosen = [r for r in self.ranked_packages if not (hide_dispositioned and r.package.package_id in latest)][
+            :top_n
+        ]
         items = []
         for position, r in enumerate(chosen, start=1):
             p = r.package
             entry = latest.get(p.package_id)
-            items.append({
-                "position": position, "rank": r.rank, "package_id": p.package_id, "title": p.title,
-                "fix_type": p.fix_type, "score": round(r.score.total, 1), "hosts": p.impact.hosts,
-                "vulnerabilities": p.impact.plugins, "actions": p.impact.actions, "findings": p.impact.findings,
-                "by_severity": p.impact.by_severity, "kev_findings": p.impact.kev_findings,
-                "contained_critical_share": round(p.impact.critical_share, 4), "why": list(priority_reasons(r.score)),
-                "disposition": entry.to_dict() if entry else None,
-            })
+            items.append(
+                {
+                    "position": position,
+                    "rank": r.rank,
+                    "package_id": p.package_id,
+                    "title": p.title,
+                    "fix_type": p.fix_type,
+                    "score": round(r.score.total, 1),
+                    "hosts": p.impact.hosts,
+                    "vulnerabilities": p.impact.plugins,
+                    "actions": p.impact.actions,
+                    "findings": p.impact.findings,
+                    "by_severity": p.impact.by_severity,
+                    "kev_findings": p.impact.kev_findings,
+                    "contained_critical_share": round(p.impact.critical_share, 4),
+                    "why": list(priority_reasons(r.score)),
+                    "disposition": entry.to_dict() if entry else None,
+                }
+            )
         return {"items": items, "as_of": self.as_of.isoformat()}
 
     # --- detail ---
@@ -231,9 +257,13 @@ class Workspace:
         max_hosts, max_vulns = _int(max_hosts, "max_hosts", 1, MAX_LIST), _int(max_vulns, "max_vulns", 1, MAX_VULNS)
         max_events = _int(max_events, "max_events", 1, MAX_LIST)
         data = self._case_view(case_id).to_dict()
-        for key, keep in (("hosts", slice(0, max_hosts)), ("vulnerabilities", slice(0, max_vulns)),
-                          ("timeline", slice(-max_events, None)), ("evidence_ids", slice(0, 25)),
-                          ("fixes", slice(0, 10))):
+        for key, keep in (
+            ("hosts", slice(0, max_hosts)),
+            ("vulnerabilities", slice(0, max_vulns)),
+            ("timeline", slice(-max_events, None)),
+            ("evidence_ids", slice(0, 25)),
+            ("fixes", slice(0, 10)),
+        ):
             data[f"{key}_total"] = len(data[key])
             data[key] = data[key][keep]
         for vuln in data["vulnerabilities"]:
@@ -243,7 +273,9 @@ class Workspace:
         return data
 
     def fix_package(self, package_id: str, max_hosts: int = 25, max_actions: int = 15) -> dict:
-        max_hosts, max_actions = _int(max_hosts, "max_hosts", 1, MAX_LIST), _int(max_actions, "max_actions", 1, MAX_LIST)
+        max_hosts, max_actions = _int(max_hosts, "max_hosts", 1, MAX_LIST), _int(
+            max_actions, "max_actions", 1, MAX_LIST
+        )
         data = self._package_view(package_id).to_dict(max_hosts)
         data["actions_total"] = len(data["package"]["actions"])
         data["package"]["actions"] = data["package"]["actions"][:max_actions]
@@ -262,14 +294,26 @@ class Workspace:
         _, item = self._item(item_id)
         members = sorted(item.active, key=lambda r: r.finding_id)
         return {
-            "item_id": item_id, "total": len(members), "offset": offset,
+            "item_id": item_id,
+            "total": len(members),
+            "offset": offset,
             "findings": [
-                {"finding_id": r.finding_id, "plugin_id": r.plugin_id, "plugin_name": r.plugin_name,
-                 "severity": r.severity, "state": r.state, "hostname": r.hostname, "ipv4": r.ipv4,
-                 "asset_uuid": r.asset_uuid, "port": r.port, "protocol": r.protocol,
-                 "first_found": r.first_found.isoformat(), "last_found": r.last_found.isoformat(),
-                 "scan_uuid": r.scan_uuid}
-                for r in members[offset:offset + limit]
+                {
+                    "finding_id": r.finding_id,
+                    "plugin_id": r.plugin_id,
+                    "plugin_name": r.plugin_name,
+                    "severity": r.severity,
+                    "state": r.state,
+                    "hostname": r.hostname,
+                    "ipv4": r.ipv4,
+                    "asset_uuid": r.asset_uuid,
+                    "port": r.port,
+                    "protocol": r.protocol,
+                    "first_found": r.first_found.isoformat(),
+                    "last_found": r.last_found.isoformat(),
+                    "scan_uuid": r.scan_uuid,
+                }
+                for r in members[offset : offset + limit]
             ],
         }
 
@@ -280,40 +324,68 @@ class Workspace:
         renderers: dict[str, Callable[[], str]]
         if kind == "case":
             cf = self._case_view(item_id)
-            renderers = {"markdown": lambda: case_markdown(cf), "json": lambda: case_json(cf),
-                         "hosts_csv": lambda: case_hosts_csv(cf)}
+            renderers = {
+                "markdown": lambda: case_markdown(cf),
+                "json": lambda: case_json(cf),
+                "hosts_csv": lambda: case_hosts_csv(cf),
+            }
         else:
             view = self._package_view(item_id)
-            renderers = {"markdown": lambda: package_markdown(view), "json": lambda: package_json(view),
-                         "hosts_csv": lambda: package_hosts_csv(view), "actions_csv": lambda: package_actions_csv(view)}
+            renderers = {
+                "markdown": lambda: package_markdown(view),
+                "json": lambda: package_json(view),
+                "hosts_csv": lambda: package_hosts_csv(view),
+                "actions_csv": lambda: package_actions_csv(view),
+            }
         if format not in renderers:
             raise ServiceError(f"format must be one of {', '.join(sorted(renderers))} for a {kind.replace('_', ' ')}")
         if write:
             if confirm is not True:
                 raise ServiceError(
-                    "writing export files requires confirm=true: ask the analyst first (this server cannot verify approval)")
+                    "writing export files requires confirm=true: ask the analyst first (this server cannot verify approval)"
+                )
             try:
-                paths = (write_case_export(cf, self.exports_dir, True) if kind == "case"
-                         else write_package_export(view, self.exports_dir, True))
+                paths = (
+                    write_case_export(cf, self.exports_dir, True)
+                    if kind == "case"
+                    else write_package_export(view, self.exports_dir, True)
+                )
             except ExportError as exc:
                 raise ServiceError(str(exc)) from None
-            return {"item_id": item_id, "written": [p.name for p in paths],
-                    "directory": "the configured export directory (EXPOSURE_CASE_EXPORTS)"}
+            return {
+                "item_id": item_id,
+                "written": [p.name for p in paths],
+                "directory": "the configured export directory (EXPOSURE_CASE_EXPORTS)",
+            }
         if format == "json":
             raise ServiceError("json exports are large; use write=true with confirm=true, or case_file / fix_package")
         content = renderers[format]()
         if len(content) > MAX_INLINE_CHARS:
-            return {"item_id": item_id, "format": format, "content": content[:MAX_INLINE_CHARS], "truncated": True,
-                    "total_chars": len(content),
-                    "note": "truncated for size; use write=true with confirm=true to save the complete files"}
+            return {
+                "item_id": item_id,
+                "format": format,
+                "content": content[:MAX_INLINE_CHARS],
+                "truncated": True,
+                "total_chars": len(content),
+                "note": "truncated for size; use write=true with confirm=true to save the complete files",
+            }
         return {"item_id": item_id, "format": format, "content": content, "truncated": False}
 
-    def record_disposition(self, item_id: str, analyst: str, disposition: str, note: str, confirm: bool = False) -> dict:
+    def record_disposition(
+        self, item_id: str, analyst: str, disposition: str, note: str, confirm: bool = False
+    ) -> dict:
         kind, _ = self._item(item_id)
         try:
             entry = dlog.record_disposition(
-                self.dispositions_path, item_id=item_id, kind=kind, analyst=analyst, disposition=disposition,
-                note=note, confirm=confirm, data_as_of=self.as_of)
+                self.dispositions_path,
+                item_id=item_id,
+                kind=kind,
+                analyst=analyst,
+                disposition=disposition,
+                note=note,
+                confirm=confirm,
+                data_as_of=self.as_of,
+            )
         except dlog.DispositionError as exc:
             raise ServiceError(str(exc)) from None
         return entry.to_dict()

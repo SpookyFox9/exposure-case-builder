@@ -92,7 +92,7 @@ def test_fetch_refuses_non_empty_output_dir(tmp_path):
 def test_requests_carry_keys_in_header_only():
     fake = FakeTenable(routes())
     client(fake).request("POST", "/vulns/export", {"num_assets": 50})
-    (_key, headers, data) = fake.calls[0]
+    _key, headers, data = fake.calls[0]
     assert headers["X-apikeys"] == "accessKey=AK;secretKey=SK"
     assert b"AK" not in data and b"SK" not in data
 

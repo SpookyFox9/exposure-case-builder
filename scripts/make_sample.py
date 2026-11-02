@@ -22,8 +22,16 @@ from exposure_case.ingest import IngestError, iter_raw_records, parse_record, re
 
 ASSET_KEYS = ("uuid", "hostname", "ipv4", "device_type", "operating_system")
 PLUGIN_KEYS = (
-    "id", "name", "family", "synopsis", "exploit_available", "exploited_by_malware", "in_the_news",
-    "has_patch", "unsupported_by_vendor", "checks_for_default_account",
+    "id",
+    "name",
+    "family",
+    "synopsis",
+    "exploit_available",
+    "exploited_by_malware",
+    "in_the_news",
+    "has_patch",
+    "unsupported_by_vendor",
+    "checks_for_default_account",
 )
 PORT_KEYS = ("port", "protocol", "service")
 SCAN_KEYS = ("uuid", "started_at")
@@ -95,7 +103,11 @@ def build_sample(src: Path, out: Path, n_plugins: int = 40, n_notable: int = 10,
     (out / "chunks").mkdir(parents=True, exist_ok=True)
     (out / "chunks" / "chunk_1.json").write_text(json.dumps(kept, indent=0, sort_keys=True), encoding="utf-8")
     (out / "plugins.json").write_text(
-        json.dumps({"vulnerabilities": [r for r in rows if isinstance(r, dict) and r.get("plugin_id") in keep]}, indent=0, sort_keys=True),
+        json.dumps(
+            {"vulnerabilities": [r for r in rows if isinstance(r, dict) and r.get("plugin_id") in keep]},
+            indent=0,
+            sort_keys=True,
+        ),
         encoding="utf-8",
     )
     return out

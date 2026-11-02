@@ -47,12 +47,35 @@ def build(recs):
 @pytest.fixture
 def world():
     recs = [
-        fx("f1", plugin=1, asset="a1", severity="critical", exploit_available=True, cve=["CVE-2023-1"],
-           see_also=["https://example.test/adv1"], solution="Upgrade to widget 2.0 or later."),
-        fx("f2", plugin=1, asset="a2", severity="critical", exploit_available=True, cve=["CVE-2023-1"],
-           see_also=["https://example.test/adv1"], solution="Upgrade to widget 2.0 or later."),
-        fx("f3", plugin=2, asset="a1", severity="medium", exploit_available=False, solution="Upgrade to widget 2.1.",
-           vpr={"on_cisa_kev": True}),
+        fx(
+            "f1",
+            plugin=1,
+            asset="a1",
+            severity="critical",
+            exploit_available=True,
+            cve=["CVE-2023-1"],
+            see_also=["https://example.test/adv1"],
+            solution="Upgrade to widget 2.0 or later.",
+        ),
+        fx(
+            "f2",
+            plugin=1,
+            asset="a2",
+            severity="critical",
+            exploit_available=True,
+            cve=["CVE-2023-1"],
+            see_also=["https://example.test/adv1"],
+            solution="Upgrade to widget 2.0 or later.",
+        ),
+        fx(
+            "f3",
+            plugin=2,
+            asset="a1",
+            severity="medium",
+            exploit_available=False,
+            solution="Upgrade to widget 2.1.",
+            vpr={"on_cisa_kev": True},
+        ),
     ]
     cases, packages, links = build(recs)
     return recs, cases, packages, links
@@ -69,6 +92,7 @@ def case_file(world, cid="plugin:1"):
 
 
 # --- sanitizers ---
+
 
 def test_md_text_neutralizes_html_and_control_characters():
     out = md_text("<script>alert(1)</script>\x00\x1b[31m hi\nthere")
@@ -93,8 +117,15 @@ def test_csv_cell_leaves_normal_values_alone():
 
 # --- engineer handoff ---
 
-SECTIONS = ["# Fix:", "## What to do", "## Impact", "## Affected hosts", "## References", "## Cases this relieves",
-            "## Source records"]
+SECTIONS = [
+    "# Fix:",
+    "## What to do",
+    "## Impact",
+    "## Affected hosts",
+    "## References",
+    "## Cases this relieves",
+    "## Source records",
+]
 
 
 def test_package_markdown_has_all_sections_in_order(world):
@@ -135,8 +166,10 @@ def test_package_markdown_caps_actions(world):
 
 
 def test_hostile_tenable_text_is_neutralized_everywhere(world):
-    evil = dataclasses.replace(fx("f9", plugin=9, asset="a9", solution="Upgrade <img src=x onerror=alert(1)> now"),
-                               hostname="=HYPERLINK(\"http://evil\")|<b>x</b>")
+    evil = dataclasses.replace(
+        fx("f9", plugin=9, asset="a9", solution="Upgrade <img src=x onerror=alert(1)> now"),
+        hostname='=HYPERLINK("http://evil")|<b>x</b>',
+    )
     _, packages, links = build([evil])
     view = build_package_view(packages[0], links, NOW)
     md = package_markdown(view)
@@ -149,8 +182,16 @@ def test_hostile_tenable_text_is_neutralized_everywhere(world):
 
 def test_hosts_csv_header_and_values(world):
     rows = list(csv.reader(io.StringIO(package_hosts_csv(package_view(world)))))
-    assert rows[0] == ["asset_uuid", "hostname", "ipv4", "operating_system", "findings", "plugins",
-                       "worst_severity", "oldest_first_found"]
+    assert rows[0] == [
+        "asset_uuid",
+        "hostname",
+        "ipv4",
+        "operating_system",
+        "findings",
+        "plugins",
+        "worst_severity",
+        "oldest_first_found",
+    ]
     assert {r[0] for r in rows[1:]} == {"a1", "a2"}
 
 
@@ -170,9 +211,18 @@ def test_package_json_round_trips_and_is_deterministic(world):
 
 # --- analyst case file ---
 
-CASE_SECTIONS = ["# Case:", "## Summary", "## Score breakdown", "## Fix packages that address this case",
-                 "## Top vulnerabilities", "## Affected hosts", "## Timeline", "## Limitations",
-                 "## Source records", "## Disposition"]
+CASE_SECTIONS = [
+    "# Case:",
+    "## Summary",
+    "## Score breakdown",
+    "## Fix packages that address this case",
+    "## Top vulnerabilities",
+    "## Affected hosts",
+    "## Timeline",
+    "## Limitations",
+    "## Source records",
+    "## Disposition",
+]
 
 
 def test_case_markdown_sections_and_disposition_slot(world):
@@ -195,6 +245,7 @@ def test_case_json_round_trips(world):
 
 
 # --- writing files ---
+
 
 def test_write_requires_confirm(world, tmp_path):
     with pytest.raises(ExportError, match="confirm"):
@@ -234,6 +285,7 @@ def test_write_is_idempotent(world, tmp_path):
 
 # --- golden file ---
 
+
 def test_package_markdown_matches_golden(world):
     golden = GOLDEN / "package_basic.md"
     assert golden.read_text(encoding="utf-8") == package_markdown(package_view(world))
@@ -245,6 +297,7 @@ def test_case_markdown_matches_golden(world):
 
 
 # --- readability caps (from reading real output) ---
+
 
 def test_cases_relieved_list_is_capped(world):
     recs = [fx(f"f{i}", plugin=i, asset=f"a{i}") for i in range(1, 31)]

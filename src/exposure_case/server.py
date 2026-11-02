@@ -45,7 +45,9 @@ these two tools on "ask" in your client's tool permissions.\
 """
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
-LOCAL_WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
+LOCAL_WRITE = ToolAnnotations(
+    read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
+)
 
 
 def _guard(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -72,8 +74,9 @@ def build_server(workspace: Workspace) -> MCPServer:
 
     @mcp.tool(annotations=READ_ONLY)
     @_guard
-    def case_queue(kind: Literal["both", "threats", "backlogs"] = "both", top_n: int = 10,
-                   hide_dispositioned: bool = False) -> dict:
+    def case_queue(
+        kind: Literal["both", "threats", "backlogs"] = "both", top_n: int = 10, hide_dispositioned: bool = False
+    ) -> dict:
         """Ranked cases. kind: 'both' (default; returns threats and backlogs as two lists), 'threats' (one
         vulnerability each) or 'backlogs' (a patch family each). Each row says why it ranks where it does.
         'rank' is the global rank; 'position' is the place in this list. hide_dispositioned hides any item
@@ -108,8 +111,12 @@ def build_server(workspace: Workspace) -> MCPServer:
 
     @mcp.tool(annotations=LOCAL_WRITE)
     @_guard
-    def export(item_id: str, format: Literal["markdown", "hosts_csv", "actions_csv", "json"] = "markdown",
-               write: StrictBool = False, confirm: StrictBool = False) -> dict:
+    def export(
+        item_id: str,
+        format: Literal["markdown", "hosts_csv", "actions_csv", "json"] = "markdown",
+        write: StrictBool = False,
+        confirm: StrictBool = False,
+    ) -> dict:
         """Render a case or fix package. format: markdown, hosts_csv, actions_csv (packages only) or json (write
         only). write=true saves ALL formats (format is ignored) to the export directory, replacing files of the
         same name, and needs confirm=true after the analyst approves. Inline results are size-capped."""
