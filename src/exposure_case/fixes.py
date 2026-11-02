@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .cluster import Cluster, slugify
+from .common import SEVERITY_ORDER, worst_severity
 from .ingest import FindingRecord
 from .schema import Evidence
 from .scoring import Score, score_cluster
@@ -49,7 +50,6 @@ _CONFIG_WORD = re.compile(r"\b(disable|enable|configure|reconfigure|restrict|fil
 _WORKAROUND = re.compile(r"\bworkaround\b")
 _MS_RELEASED = re.compile(r"^microsoft has released\b")
 _UNESCAPED_COLON = re.compile(r"(?<!\\):")
-SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 
 
 def _cpe_part(part: str) -> str:
@@ -102,11 +102,6 @@ def classify_fix(solution: str) -> str:
     if first == "contact" and _PATCH_WORD.search(text) and not _CONFIG_WORD.search(text):
         return "patch"
     return "configuration"
-
-
-def _worst(severities: Iterable[str]) -> str:
-    present = set(severities)
-    return next((s for s in SEVERITY_ORDER if s in present), "info")
 
 
 @dataclass(frozen=True)
@@ -264,7 +259,7 @@ def _actions(members: list[FindingRecord], fleet_critical: int) -> tuple[FixActi
                 len({r.plugin_id for r in rs}),
                 len(rs),
                 len({r.asset_uuid for r in rs}),
-                _worst(r.severity for r in rs),
+                worst_severity(r.severity for r in rs),
                 critical,
                 critical / fleet_critical if fleet_critical else 0.0,
             )
@@ -287,7 +282,7 @@ def host_lines(members: list[FindingRecord]) -> tuple[HostLine, ...]:
                 latest.operating_system[0] if latest.operating_system else "",
                 len(rs),
                 len({r.plugin_id for r in rs}),
-                _worst(r.severity for r in rs),
+                worst_severity(r.severity for r in rs),
                 min(r.first_found for r in rs),
             )
         )

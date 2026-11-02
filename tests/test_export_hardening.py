@@ -12,7 +12,6 @@ from test_export import NOW, build, case_file, fx, package_view, world  # noqa: 
 from exposure_case.case import build_case_file, build_package_view
 from exposure_case.export import (
     ExportError,
-    _pct,
     case_markdown,
     csv_cell,
     md_cell,
@@ -24,6 +23,7 @@ from exposure_case.export import (
     write_package_export,
 )
 from exposure_case.ingest import IngestError, parse_record
+from exposure_case.report_md import format_share
 
 
 def unescaped(text: str, chars: str) -> list[str]:
@@ -146,7 +146,7 @@ def test_csv_round_trips_non_ascii(world, tmp_path):  # noqa: F811
     ],
 )
 def test_percentages_never_round_up_to_a_full_clear(share, expected):
-    assert _pct(share) == expected
+    assert format_share(share) == expected
 
 
 # --- writing files ---

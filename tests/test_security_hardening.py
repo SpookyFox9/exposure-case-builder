@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
-from helpers_review import SAMPLE, ws_for
+from sample_helpers import SAMPLE, ws_for
 
 import exposure_case.ingest as ing
 from exposure_case.export import md_cell, md_text
@@ -34,7 +34,7 @@ def test_hostile_numbers_in_plugins_json_do_not_crash(tmp_path, count):
 
 
 def test_workspace_loads_with_hostile_plugins_json(tmp_path):
-    from helpers_review import copy_sample
+    from sample_helpers import copy_sample
 
     data = copy_sample(tmp_path / "data")
     (data / "plugins.json").write_text(

@@ -11,7 +11,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 
-from .fixes import SEVERITY_ORDER, FixPackage, HostLine, RankedPackage, classify_fix, host_lines
+from .common import SEVERITY_ORDER, plural, worst_severity
+from .fixes import FixPackage, HostLine, RankedPackage, classify_fix, host_lines
 from .ingest import FindingRecord
 from .links import Link, Links
 from .scoring import RankedCluster, Score
@@ -66,10 +67,6 @@ class VulnLine:
             "fix_type": self.fix_type,
             "solution": self.solution,
         }
-
-
-def _plural(n: int, word: str, many: str | None = None) -> str:
-    return f"{n:,} {word}" if n == 1 else f"{n:,} {many or word + 's'}"
 
 
 def vulnerability_lines(members: list[FindingRecord]) -> tuple[VulnLine, ...]:
@@ -128,11 +125,11 @@ def case_facts(members: list[FindingRecord], as_of: datetime) -> dict:
 
 def facts_summary(facts: dict, as_of: datetime) -> tuple[str, ...]:
     """Plain, checkable statements; every number comes straight from ``facts``."""
-    worst = next((s for s in SEVERITY_ORDER if facts["by_severity"].get(s)), "info")
+    worst = worst_severity(sev for sev, count in facts["by_severity"].items() if count)
     lines = [
         (
-            f"{_plural(facts['hosts'], 'host')}, {_plural(facts['findings'], 'finding')} across "
-            f"{_plural(facts['vulnerabilities'], 'vulnerability', 'vulnerabilities')}."
+            f"{plural(facts['hosts'], 'host')}, {plural(facts['findings'], 'finding')} across "
+            f"{plural(facts['vulnerabilities'], 'vulnerability', 'vulnerabilities')}."
         ),
         f"Worst severity: {worst}.",
     ]
@@ -143,8 +140,8 @@ def facts_summary(facts: dict, as_of: datetime) -> tuple[str, ...]:
         ("reopened_findings", "reopened after being fixed"),
     ):
         if facts[key]:
-            lines.append(f"{_plural(facts[key], 'finding')} {text}.")
-    age = _plural(facts["age_days"], "day")
+            lines.append(f"{plural(facts[key], 'finding')} {text}.")
+    age = plural(facts["age_days"], "day")
     lines.append(f"The oldest finding was first seen {age} before the data snapshot ({as_of.date()}).")
     return tuple(lines)
 

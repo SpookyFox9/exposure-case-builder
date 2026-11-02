@@ -18,10 +18,11 @@ from itertools import islice
 from pathlib import Path
 from typing import Any
 
+from .common import SEVERITY_ORDER
 from .schema import Evidence
 
 VALID_STATES = frozenset({"OPEN", "REOPENED", "FIXED"})
-VALID_SEVERITIES = frozenset({"info", "low", "medium", "high", "critical"})
+VALID_SEVERITIES = frozenset(SEVERITY_ORDER)
 MAX_FILE_BYTES = 128 * 1024 * 1024  # largest export chunk seen is about 36 MB
 MAX_TOTAL_BYTES = 1024 * 1024 * 1024  # a 160-host tenant is about 108 MB in total
 MAX_CHUNK_FILES = 1000
@@ -193,14 +194,8 @@ def _optional_ts(value: Any) -> datetime | None:
         return None
 
 
-def parse_record(raw: Any) -> FindingRecord:
-    """Validate and normalize one export record."""
-    if not isinstance(raw, dict):
-        raise IngestError("record is not an object")
-    asset, plugin = _section(raw, "asset"), _section(raw, "plugin")
-    port = _optional_section(raw, "port")
-    scan = _optional_section(raw, "scan")
-
+def _validated_keys(raw: dict, plugin: dict) -> tuple[int, str, str]:
+    """(plugin_id, state, severity), each checked against its known vocabulary."""
     state = _required_str(raw, "state", "record").upper()
     if state not in VALID_STATES:
         raise IngestError(f"unknown state: {state!r}")
@@ -210,53 +205,82 @@ def parse_record(raw: Any) -> FindingRecord:
     plugin_id = _opt_int(plugin.get("id"))
     if plugin_id is None:
         raise IngestError("missing required field: plugin.id")
+    return plugin_id, state, severity
 
-    started = scan.get("started_at")
-    os_list = asset.get("operating_system")
+
+def _identity_fields(raw: dict, asset: dict, plugin: dict) -> dict[str, Any]:
+    """Who and where: the finding, its plugin, the host, the port and the scan."""
+    port, scan = _optional_section(raw, "port"), _optional_section(raw, "scan")
+    started, os_list = scan.get("started_at"), asset.get("operating_system")
+    return {
+        "finding_id": _required_str(raw, "finding_id", "record"),
+        "plugin_name": _text(plugin.get("name")),
+        "plugin_family": _text(plugin.get("family")),
+        "synopsis": _text(plugin.get("synopsis")),
+        "first_found": _parse_ts(raw.get("first_found"), "first_found"),
+        "last_found": _parse_ts(raw.get("last_found"), "last_found"),
+        "asset_uuid": _required_str(asset, "uuid", "asset"),
+        "hostname": _text(asset.get("hostname")),
+        "ipv4": _text(asset.get("ipv4")),
+        "operating_system": tuple(o for o in os_list if isinstance(o, str)) if isinstance(os_list, list) else (),
+        "device_type": _text(asset.get("device_type")),
+        "port": _opt_int(port.get("port")),
+        "protocol": _text(port.get("protocol")),
+        "service": _text(port.get("service")),
+        "scan_uuid": _text(scan.get("uuid")),
+        "scan_started": _parse_ts(started, "scan.started_at") if started else None,
+        "output": _text(raw.get("output"), MAX_TEXT_CHARS * 2),
+    }
+
+
+def _signal_fields(plugin: dict) -> dict[str, Any]:
+    """Risk signals: exploitation flags and the VPR object."""
     vpr = _optional_section(plugin, "vpr")
+    return {
+        "exploit_available": bool(plugin.get("exploit_available")),
+        "exploited_by_malware": bool(plugin.get("exploited_by_malware")),
+        "in_the_news": bool(plugin.get("in_the_news")),
+        "has_patch": bool(plugin.get("has_patch")),
+        "unsupported_by_vendor": bool(plugin.get("unsupported_by_vendor")),
+        "checks_for_default_account": bool(plugin.get("checks_for_default_account")),
+        "epss_score": _opt_number(plugin.get("epss_score"), 0),
+        "cvss3_base_score": _opt_number(plugin.get("cvss3_base_score"), 0, 10),
+        "vpr_score": _opt_number(vpr.get("score"), 0, 10),
+        "vpr_severity": _text(vpr.get("vpr_severity")),
+        "on_cisa_kev": vpr.get("on_cisa_kev") is True,
+        "exploit_code_maturity": _text(vpr.get("exploit_code_maturity")),
+    }
+
+
+def _fix_fields(raw: dict, plugin: dict) -> dict[str, Any]:
+    """How it gets fixed: Tenable's solution text, references and fix history."""
     fix_seconds = _opt_int(raw.get("time_taken_to_fix"))
+    return {
+        "solution": _text(plugin.get("solution")).strip(),
+        "see_also": _str_tuple(plugin.get("see_also")),
+        "cves": _str_tuple(plugin.get("cve")),
+        "cpe": _str_tuple(plugin.get("cpe")),
+        "has_workaround": plugin.get("has_workaround") is True,
+        "patch_published": _optional_ts(plugin.get("patch_publication_date")),
+        "last_fixed": _optional_ts(raw.get("last_fixed")),
+        "resurfaced": _optional_ts(raw.get("resurfaced_date")),
+        "fix_seconds": fix_seconds if fix_seconds is not None and fix_seconds >= 0 else None,
+    }
+
+
+def parse_record(raw: Any) -> FindingRecord:
+    """Validate and normalize one export record."""
+    if not isinstance(raw, dict):
+        raise IngestError("record is not an object")
+    asset, plugin = _section(raw, "asset"), _section(raw, "plugin")
+    plugin_id, state, severity = _validated_keys(raw, plugin)
     return FindingRecord(
-        finding_id=_required_str(raw, "finding_id", "record"),
         plugin_id=plugin_id,
-        plugin_name=_text(plugin.get("name")),
-        plugin_family=_text(plugin.get("family")),
-        synopsis=_text(plugin.get("synopsis")),
-        severity=severity,
         state=state,
-        first_found=_parse_ts(raw.get("first_found"), "first_found"),
-        last_found=_parse_ts(raw.get("last_found"), "last_found"),
-        asset_uuid=_required_str(asset, "uuid", "asset"),
-        hostname=_text(asset.get("hostname")),
-        ipv4=_text(asset.get("ipv4")),
-        operating_system=tuple(o for o in os_list if isinstance(o, str)) if isinstance(os_list, list) else (),
-        device_type=_text(asset.get("device_type")),
-        port=_opt_int(port.get("port")),
-        protocol=_text(port.get("protocol")),
-        service=_text(port.get("service")),
-        scan_uuid=_text(scan.get("uuid")),
-        scan_started=_parse_ts(started, "scan.started_at") if started else None,
-        exploit_available=bool(plugin.get("exploit_available")),
-        exploited_by_malware=bool(plugin.get("exploited_by_malware")),
-        in_the_news=bool(plugin.get("in_the_news")),
-        has_patch=bool(plugin.get("has_patch")),
-        unsupported_by_vendor=bool(plugin.get("unsupported_by_vendor")),
-        checks_for_default_account=bool(plugin.get("checks_for_default_account")),
-        output=_text(raw.get("output"), MAX_TEXT_CHARS * 2),
-        solution=_text(plugin.get("solution")).strip(),
-        see_also=_str_tuple(plugin.get("see_also")),
-        cves=_str_tuple(plugin.get("cve")),
-        cpe=_str_tuple(plugin.get("cpe")),
-        has_workaround=plugin.get("has_workaround") is True,
-        patch_published=_optional_ts(plugin.get("patch_publication_date")),
-        cvss3_base_score=_opt_number(plugin.get("cvss3_base_score"), 0, 10),
-        epss_score=_opt_number(plugin.get("epss_score"), 0),
-        vpr_score=_opt_number(vpr.get("score"), 0, 10),
-        vpr_severity=_text(vpr.get("vpr_severity")),
-        on_cisa_kev=vpr.get("on_cisa_kev") is True,
-        exploit_code_maturity=_text(vpr.get("exploit_code_maturity")),
-        last_fixed=_optional_ts(raw.get("last_fixed")),
-        resurfaced=_optional_ts(raw.get("resurfaced_date")),
-        fix_seconds=fix_seconds if fix_seconds is not None and fix_seconds >= 0 else None,
+        severity=severity,
+        **_identity_fields(raw, asset, plugin),
+        **_signal_fields(plugin),
+        **_fix_fields(raw, plugin),
     )
 
 

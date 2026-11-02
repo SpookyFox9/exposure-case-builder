@@ -9,11 +9,12 @@ audit trail.
 from __future__ import annotations
 
 import json
-import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+from .text_safety import single_line
 
 DISPOSITIONS = ("assigned", "risk-accepted", "false-positive", "needs-info")
 KINDS = ("case", "fix_package")
@@ -21,7 +22,6 @@ MAX_NOTE_CHARS = 2000
 MAX_ANALYST_CHARS = 80
 MAX_ITEM_ID_CHARS = 200
 MAX_LOG_BYTES = 5 * 1024 * 1024  # a worklog, not a database; refuse to grow past this
-_STRIPPED = frozenset({"Cc", "Cf", "Zl", "Zp"})
 
 
 class DispositionError(ValueError):
@@ -50,11 +50,6 @@ class Disposition:
         }
 
 
-def _clean(value: str) -> str:
-    text = value.replace("\t", " ").replace("\n", " ").replace("\r", " ")
-    return " ".join("".join(ch for ch in text if unicodedata.category(ch) not in _STRIPPED).split())
-
-
 def _aware(value: datetime, name: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None:
         raise DispositionError(f"{name} must be a timezone-aware datetime")
@@ -63,6 +58,43 @@ def _aware(value: datetime, name: str) -> datetime:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _validated_entry(
+    item_id: str,
+    kind: str,
+    analyst: str,
+    disposition: str,
+    note: str,
+    recorded_at: datetime,
+    data_as_of: datetime,
+) -> Disposition:
+    """Check every field and return the entry, or raise DispositionError naming the first bad field."""
+    if disposition not in DISPOSITIONS:
+        raise DispositionError(f"disposition must be one of {', '.join(DISPOSITIONS)}")
+    if kind not in KINDS:
+        raise DispositionError(f"kind must be one of {', '.join(KINDS)}")
+    if (
+        not isinstance(item_id, str)
+        or not item_id
+        or len(item_id) > MAX_ITEM_ID_CHARS
+        or single_line(item_id) != item_id
+    ):
+        raise DispositionError("item_id is empty, too long or contains control characters")
+    analyst_clean = single_line(analyst) if isinstance(analyst, str) else ""
+    if not analyst_clean or len(analyst_clean) > MAX_ANALYST_CHARS:
+        raise DispositionError(f"analyst is required and at most {MAX_ANALYST_CHARS} characters")
+    if not isinstance(note, str) or len(note) > MAX_NOTE_CHARS:
+        raise DispositionError(f"note must be text of at most {MAX_NOTE_CHARS} characters")
+    return Disposition(
+        item_id,
+        kind,
+        analyst_clean,
+        disposition,
+        single_line(note),
+        _aware(recorded_at, "clock()"),
+        _aware(data_as_of, "data_as_of"),
+    )
 
 
 def record_disposition(
@@ -82,27 +114,7 @@ def record_disposition(
         raise DispositionError(
             "recording a disposition requires confirm=true: ask the analyst first (this server cannot verify approval)"
         )
-    if disposition not in DISPOSITIONS:
-        raise DispositionError(f"disposition must be one of {', '.join(DISPOSITIONS)}")
-    if kind not in KINDS:
-        raise DispositionError(f"kind must be one of {', '.join(KINDS)}")
-    if not isinstance(item_id, str) or not item_id or len(item_id) > MAX_ITEM_ID_CHARS or _clean(item_id) != item_id:
-        raise DispositionError("item_id is empty, too long or contains control characters")
-    analyst_clean = _clean(analyst) if isinstance(analyst, str) else ""
-    if not analyst_clean or len(analyst_clean) > MAX_ANALYST_CHARS:
-        raise DispositionError(f"analyst is required and at most {MAX_ANALYST_CHARS} characters")
-    if not isinstance(note, str) or len(note) > MAX_NOTE_CHARS:
-        raise DispositionError(f"note must be text of at most {MAX_NOTE_CHARS} characters")
-    entry = Disposition(
-        item_id,
-        kind,
-        analyst_clean,
-        disposition,
-        _clean(note),
-        _aware(clock(), "clock()"),
-        _aware(data_as_of, "data_as_of"),
-    )
-
+    entry = _validated_entry(item_id, kind, analyst, disposition, note, clock(), data_as_of)
     target = Path(path)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
