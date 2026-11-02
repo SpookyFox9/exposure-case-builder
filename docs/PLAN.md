@@ -179,8 +179,14 @@ Fix-type rule (documented in `fixes.py`): the solution's opening verb decides. u
 7. [x] Tenable User-Agent: every API call sends `Integration/1.0 (VENDOR; PRODUCT; Build/VERSION)` per https://developer.tenable.com/docs/user-agent-header (read 2026-11-02; Tenable "recommends" it and lists it as a validation criterion in the VM integration guide). The page does not mention contact details in the string; vendor defaults to the project name and `TENABLE_UA_VENDOR` overrides it. 8 tests. The survey scripts used earlier in this session (scratchpad, outside the repo) sent Python's default agent.
 
 **Phase 6: polish and submit**
-1. [ ] Full-history secret scan, tag v0.1.0, Exchange PR (use `/cyberagents-exchange-submit`)
-2. [ ] Rehearse the demo; confirm submission details at office hours
+1. [x] Full-history secret scan: 12 commits, gitleaks clean; commits use the GitHub noreply address; no personal email in history. The Windows username appears in a path in two early commits (not rewritten; removed from the current tree)
+2. [x] README finished: every Exchange-required section, a data-flow section naming every outbound call, honest limitations, security notes, dependency licenses. Install verified from a fresh clone: `uv sync`, 472 tests, server answers on the sample
+3. [x] Exchange listing drafted at `docs/exchange/mcp-server-listing.md` (MCP server, validated by `tests/test_listing.py` against the vocabularies read on 2026-11-02 and against the real server's tool list)
+4. [ ] One live Claude Code session on the sample (user runs `claude mcp add`; see the playbook)
+5. [ ] Create the public GitHub repo on the personal account and push (user)
+6. [ ] Tag v0.1.0 after the live session and push the tag
+7. [ ] Fork tenable/cyberagents-exchange, copy the listing to `mcp-servers/exposure-case-builder.md`, set `contribution_agreement_date` to the moment you accept the CyberAgents Contribution Agreement, set the final `github_url` and `date_added`, run the Exchange's own `uv run ./validator.py`, open the PR titled `Add listing: Exposure Case Builder` with the acceptance statement in the description
+8. [ ] Decide on a second listing for the skill (the checklist as reported wants `SKILL.md` at the repo root; ours is in `skills/exposure-case/`) and rehearse the demo; confirm submission details at office hours
 
 ## Risks
 
@@ -194,9 +200,10 @@ Fix-type rule (documented in `fixes.py`): the solution's opening verb decides. u
 
 ## Unverified items (do not assume)
 
-- Official Rules were not read. Open: whether pre-existing code is allowed or work must start during the event; repo-structure, demo-video and pitch-deck requirements; data restrictions; whether all submissions or only winners must be listed on the Exchange.
-- Submission deadline and pitch-selection process; assumed Wednesday, confirm at office hours.
-- The Exchange repo details (`/cyberagents-exchange-submit`, `validator.py` vocabularies) came from the research doc; they were not re-fetched.
+- Official Rules were not read. Open: whether pre-existing code is allowed or work must start during the event; repo-structure, demo-video and pitch-deck requirements; data restrictions; whether all submissions or only winners must be listed on the Exchange. This repo was started before the event (Nov 2 evening); the pivot to Tenable data happened during it.
+- Submission deadline and pitch-selection process; assumed Wednesday Nov 4, confirm at office hours.
+- Exchange mechanics, **verified 2026-11-02 from tenable/cyberagents-exchange (README, CONTRIBUTING.md, validator.py, templates, docs/contributing_checklist.md)**: one new markdown file per PR (so one PR per listing); branch `add-<slug>`; PR title `Add listing: <Name>`; PR description must state acceptance of the CyberAgents Contribution Agreement; `tier` must be `contributed`; `domains` and `contribution_agreement_date` are required in practice; `github_url` and `author` must match the real remote; no release-tag field. Not read: the Contribution Agreement itself, SECURITY.md, the submission-builder skill. The skill that automates this (`/cyberagents-exchange-submit`) is not installed in this environment.
+- Tenable's User-Agent guide says "recommends"; the VM integration guide lists it as a validation criterion.
 - Judging criteria and weights are unpublished. The user's priority is impact on real security work.
 - Tenable items listed under "Tenable data facts".
 
@@ -212,12 +219,13 @@ Last updated: 2026-11-02, Monday evening.
 - Done (Phase 3): `cluster.py`, `scoring.py`, `timeline.py`, `reconcile.py`; 139 tests pass; ruff and mypy clean. 815 cases from the full export (15 patch families, 800 plugins). Weights approved.
 - Done (Phase 4): case file and package view with Markdown/CSV/JSON exports, security-reviewed; 345 tests, ruff and mypy clean.
 - Done (Phase 5, pending review): disposition log, service layer, 8-tool MCP server with contract tests, skill and playbook; 472 tests, reviewed.
-- Next: register the server in Claude Code and run one live session (user runs `claude mcp add`), a review pass on `service.py`/`server.py`/`disposition.py`, then Phase 6 (full-history secret scan, README finish, tag v0.1.0, Exchange PR).
+- Done (Phase 6, local part): history scan, README, fresh-clone install check, drafted Exchange listing. 481 tests.
+- Next, all needing the user: the live Claude Code session, creating the public GitHub repo, tagging v0.1.0, and the Exchange PR (it carries the user's own acceptance of the Contribution Agreement).
 
 ## Resuming in a new session
 
 ```bash
-cd "C:/Users/maupi/Documents/Obsidian Vault/SWARM/insider-case-builder"
+cd <path to this repo>
 uv sync                      # create .venv with pinned deps (Python >=3.10)
 uv run pytest                # run tests
 ```
