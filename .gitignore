@@ -1,0 +1,22 @@
+# Raw and subset CERT data must never be committed
+data/raw/
+data/subset/
+data/cert/
+*.zip
+*.tar*
+# Local analyst output
+cases/
+dispositions.jsonl
+# Python / env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+# Editor / vault
+.obsidian/
