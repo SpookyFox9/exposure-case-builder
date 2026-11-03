@@ -41,7 +41,7 @@ from .export import (
 from .fixes import FixPackage, RankedPackage, build_fix_packages, rank_packages
 from .ingest import FindingRecord, IngestError, load_findings, load_plugin_info
 from .links import Links, link_cases_and_fixes
-from .reconcile import reconcile
+from .reconcile import quality_summary, reconcile
 from .scoring import RankedCluster, as_of_from, fleet_size, rank_clusters
 from .trend import CATEGORIES, diff
 from .trend_view import NO_BASELINE_NOTE, TrendReport
@@ -141,7 +141,7 @@ class Workspace:
         self._coverage = {s.package_id: s for s in self._coverage_steps}
         self._cases = {r.cluster.cluster_id: r for r in self.ranked_cases}
         self._packages = {r.package.package_id: r for r in self.ranked_packages}
-        self._reconciliation = reconcile(records, plugin_info).to_dict() if plugin_info else None
+        self._quality = quality_summary(reconcile(records, plugin_info)) if plugin_info else None
         self._log_cache: tuple[tuple[int, int] | None, dict[str, dlog.Disposition], int] | None = None
         self._case_files: dict[str, CaseFile] = {}
         self._package_views: dict[str, PackageView] = {}
@@ -230,15 +230,7 @@ class Workspace:
             notes.append(
                 f"{warnings} unreadable line(s) in the disposition log were skipped; see EXPOSURE_CASE_DISPOSITIONS."
             )
-        quality = (
-            {
-                "data_quality": {
-                    k: self._reconciliation[k] for k in ("compared", "exact", "mismatch_count", "not_in_workbench")
-                }
-            }
-            if self._reconciliation
-            else {}
-        )
+        quality = {"data_quality": dict(self._quality)} if self._quality else {}
         return {
             "as_of": self.as_of.isoformat(),
             "hosts": self.fleet,

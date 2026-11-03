@@ -31,8 +31,9 @@ COVERAGE_NOTE = (
     "malware or a public exploit) if every listed action in this package and in every earlier step is applied; "
     "the figures assume that, including for packages hidden or dispositioned in this view. 'Cleared' means no "
     "urgent finding in this export, not that a host is secure or that lower-severity findings are gone; hosts "
-    "that were not scanned are not counted. It is a heuristic, not the shortest plan. Tenable's data does not "
-    "say one update replaces another."
+    "that were not scanned are not counted. It is a heuristic, not the shortest plan. Each step's figures depend "
+    "on every earlier step, so reordering steps or adding up a subset does not give that plan's figures. "
+    "Tenable's data does not say one update replaces another."
 )
 
 

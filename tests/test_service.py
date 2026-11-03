@@ -44,6 +44,15 @@ def test_fleet_summary_is_consistent(ws, records):
     assert any("masked" in note for note in s["notes"])
 
 
+def test_fleet_summary_data_quality_says_what_it_compares_and_which_way(ws):
+    # The rehearsal read "25 of 50 mismatch" as 50 records. They are plugins, and every gap is the export
+    # below Tenable's own count; the answer must carry that, so nobody reads it as half the data being wrong.
+    q = ws.fleet_summary()["data_quality"]
+    assert q["compared_unit"] == "plugins"
+    assert q["export_below_workbench"] + q["export_above_workbench"] <= q["mismatch_count"]
+    assert "plugin" in q["note"] and "Tenable" in q["note"] and "unverified" in q["note"]
+
+
 # --- queues ---
 
 

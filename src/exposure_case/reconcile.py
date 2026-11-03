@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from .ingest import FindingRecord, PluginInfo
 
@@ -90,3 +91,26 @@ def reconcile(records: Iterable[FindingRecord], plugin_info: Mapping[int, Plugin
         not_in_workbench=missing,
         mismatches=tuple(mismatches),
     )
+
+
+QUALITY_NOTE = (
+    "Counts are plugins, not findings: per plugin, the export's host (or finding) count is compared with Tenable's "
+    "own plugin-level count. A mismatch means the counts differ for that plugin, not that its findings are wrong. "
+    "export_below_workbench and export_above_workbench count the mismatches where both export counts are below, "
+    "or both above, Tenable's; any other mismatch has Tenable's count between the two. The cause of the gaps is "
+    "unverified."
+)
+
+
+def quality_summary(rec: Reconciliation) -> dict[str, Any]:
+    """The reconciliation counts as fleet_summary reports them, labelled with their unit and direction."""
+    return {
+        "compared_unit": "plugins",
+        "compared": rec.compared,
+        "exact": rec.exact,
+        "mismatch_count": len(rec.mismatches),
+        "export_below_workbench": rec.export_below_workbench,
+        "export_above_workbench": rec.export_above_workbench,
+        "not_in_workbench": rec.not_in_workbench,
+        "note": QUALITY_NOTE,
+    }

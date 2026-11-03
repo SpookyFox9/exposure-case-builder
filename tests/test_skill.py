@@ -56,6 +56,9 @@ def test_skill_does_not_invent_tools(tool_names):
         "fleet_summary",
         "record_disposition",
         "risk_accepted",
+        "data_quality",
+        "export_below_workbench",
+        "export_above_workbench",
         *CATEGORIES,
     }
     unknown = {c for c in candidates if c not in tool_names and c not in known_fields}
@@ -113,3 +116,32 @@ def test_skill_never_lets_absence_stand_in_for_a_fix():
     assert "trend_diff" in text
     for phrase in ("never call a finding fixed", "only `fixed_recorded`", "host overlap"):
         assert phrase in text, phrase
+
+
+def _skill_text() -> str:
+    return " ".join(SKILL.read_text(encoding="utf-8").lower().split())
+
+
+def test_skill_forbids_reordering_or_resumming_coverage_steps():
+    # Rehearsal 2026-11-03: Claude moved steps 5-7 ahead and added their host counts, which only hold after
+    # steps 1-4. Each step's figure depends on every earlier step.
+    text = _skill_text()
+    for phrase in ("never reorder", "depends on every earlier step", "recomputed"):
+        assert phrase in text, phrase
+
+
+def test_skill_limits_claims_to_what_the_tools_returned():
+    text = _skill_text()
+    for phrase in ("only, most, first, cheapest", "effort", "do not infer causes", "not from tenable's data"):
+        assert phrase in text, phrase
+
+
+def test_skill_shows_exports_and_explains_source_records():
+    text = _skill_text()
+    for phrase in ("show the returned document", "source records", "no owner"):
+        assert phrase in text, phrase
+
+
+def test_skill_explains_the_data_quality_figures():
+    text = _skill_text()
+    assert "data_quality" in text and "plugins, not findings" in text

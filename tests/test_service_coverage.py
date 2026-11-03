@@ -68,6 +68,12 @@ def test_the_note_is_only_sent_with_the_coverage_order_and_says_what_it_assumes(
         assert phrase in COVERAGE_NOTE
 
 
+def test_the_note_warns_that_steps_cannot_be_reordered_or_resummed():
+    # Rehearsal 2026-11-03: the model moved steps 5-7 first and added their counts; those only hold after 1-4.
+    for phrase in ("reordering steps", "a subset", "does not give"):
+        assert phrase in COVERAGE_NOTE, phrase
+
+
 def test_fix_package_includes_its_coverage_step(ws):
     row = next(i for i in ws.fix_queue(top_n=50, order="coverage")["items"] if i["coverage"])
     assert ws.fix_package(row["package_id"])["coverage"] == row["coverage"]
