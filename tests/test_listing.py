@@ -177,10 +177,12 @@ def test_it_does_not_claim_the_hexa_mcp(listing):
     assert meta["works_with_tenable_hexa_mcp"] is False and "Tenable Hexa AI MCP" not in meta["integrations"]
 
 
-def test_the_agreement_date_is_left_for_the_human(listing):
-    """The contribution agreement is the submitter's own attestation: the draft must never fill it in."""
+def test_the_agreement_date_is_the_submitters_recorded_acceptance(listing):
+    """Set only after the submitter said they accept (2026-11-03T22:24:56Z); never a placeholder or a guess."""
     meta, _, _ = listing
-    assert meta["contribution_agreement_date"] == PLACEHOLDER
+    stamp = str(meta["contribution_agreement_date"])
+    assert stamp != PLACEHOLDER
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", stamp)
 
 
 def test_body_has_the_required_sections_and_discloses_outbound_calls(listing):

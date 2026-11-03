@@ -8,8 +8,8 @@ tier: "contributed"
 tags: ["triage", "prioritization", "remediation", "mcp", "tenable-vm", "case-management"]
 domains: ["vulnerability-management"]
 integrations: ["Tenable"]
-date_added: 2026-11-02
-contribution_agreement_date: REPLACE_WITH_YOUR_ACCEPTANCE_TIMESTAMP
+date_added: 2026-11-03
+contribution_agreement_date: 2026-11-03T22:24:56Z
 works_with_tenable_hexa_mcp: false
 transport: "stdio"
 runtime: "python"
