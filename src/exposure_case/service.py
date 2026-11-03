@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from . import disposition as dlog
+from .baseline import Baseline, BaselineError, load_baseline
 from .case import (
     SCOPE_NOTE,
     CaseFile,
@@ -42,11 +43,14 @@ from .ingest import FindingRecord, IngestError, load_findings, load_plugin_info
 from .links import Links, link_cases_and_fixes
 from .reconcile import reconcile
 from .scoring import RankedCluster, as_of_from, fleet_size, rank_clusters
+from .trend import CATEGORIES, diff
+from .trend_view import NO_BASELINE_NOTE, TrendReport
 
 QUEUE_KINDS = {"threats": "plugin", "backlogs": "patch_family"}
 MAX_TOP_N = 50
 MAX_LIST = 500
 MAX_PAGE = 100
+MAX_OFFSET = 10_000_000
 MAX_VULNS = 100
 MAX_INLINE_CHARS = 60_000
 MAX_SOLUTION_CHARS = 500
@@ -119,8 +123,12 @@ class Workspace:
         plugin_info: dict[int, Any],
         exports_dir: Path,
         dispositions_path: Path,
+        baseline: Baseline | None = None,
     ) -> None:
         self.records = records
+        self._trend = (
+            TrendReport(diff(baseline.records, records), baseline.notes, baseline.synthetic) if baseline else None
+        )
         self.exports_dir = Path(exports_dir)
         self.dispositions_path = Path(dispositions_path)
         self.fleet = fleet_size(records)
@@ -139,12 +147,22 @@ class Workspace:
         self._package_views: dict[str, PackageView] = {}
 
     @classmethod
-    def load(cls, data_dir: str | Path, exports_dir: str | Path, dispositions_path: str | Path) -> Workspace:
+    def load(
+        cls,
+        data_dir: str | Path,
+        exports_dir: str | Path,
+        dispositions_path: str | Path,
+        baseline_dir: str | Path | None = None,
+    ) -> Workspace:
         data = Path(data_dir)
         if not data.is_dir():
             raise ServiceError(f"data directory not found: {data}")
         try:
-            return cls(load_findings(data), load_plugin_info(data), Path(exports_dir), Path(dispositions_path))
+            records = load_findings(data)
+            baseline = load_baseline(Path(baseline_dir), data, records) if baseline_dir else None
+            return cls(records, load_plugin_info(data), Path(exports_dir), Path(dispositions_path), baseline)
+        except BaselineError as exc:
+            raise ServiceError(str(exc)) from None
         except IngestError as exc:
             raise ServiceError(f"cannot load the export: {exc}") from None
 
@@ -363,9 +381,18 @@ class Workspace:
             "disposition": _disposition_detail(self._latest().get(package_id)),
         }
 
+    def trend_diff(self, category: str | None = None, limit: int = 25, offset: int = 0) -> dict[str, Any]:
+        """What changed since the baseline pull: a summary, or one page of one category."""
+        limit, offset = _int(limit, "limit", 1, MAX_PAGE), _int(offset, "offset", 0, MAX_OFFSET)
+        if category is not None and (not isinstance(category, str) or category not in CATEGORIES):
+            raise ServiceError(f"category must be one of: {', '.join(CATEGORIES)}")
+        if self._trend is None:
+            return {"configured": False, "note": NO_BASELINE_NOTE}
+        return self._trend.summary() if category is None else self._trend.page(category, limit, offset)
+
     def findings(self, item_id: str, limit: int = 25, offset: int = 0) -> dict[str, Any]:
         """The real finding records behind a case or package, so a narrative can cite genuine ids."""
-        limit, offset = _int(limit, "limit", 1, MAX_PAGE), _int(offset, "offset", 0, 10_000_000)
+        limit, offset = _int(limit, "limit", 1, MAX_PAGE), _int(offset, "offset", 0, MAX_OFFSET)
         _, item = self._item(item_id)
         members = sorted(item.active, key=lambda r: r.finding_id)
         return {

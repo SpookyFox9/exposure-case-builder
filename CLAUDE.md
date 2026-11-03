@@ -21,6 +21,7 @@ sh scripts/check_all.sh                    # every quality gate (the hook and CI
 uv run pytest                              # all tests; add -m unit | integration | e2e to select a category
 uv run pytest tests/test_x.py::test_name   # single test
 EXPOSURE_CASE_DATA="$PWD/data/sample" uv run python -m exposure_case.server   # stdio MCP server on the committed sample
+uv run python scripts/make_baseline.py data/sample <new-dir>   # synthetic earlier pull for the trend diff demo (EXPOSURE_CASE_BASELINE=<new-dir>)
 ```
 
 `check_all.sh` runs, in order: `ruff check` (lint, import order, McCabe complexity, no `print`), `black --check`, `mypy`, `bandit`, `scripts/check_standards.py` (file size, function length, nesting, frozen dataclasses), and the tests under `coverage` with an 80% gate. Settings live in `pyproject.toml`; the tools are pinned dev dependencies. The pre-commit hook also runs `gitleaks` on the staged diff. There is no build step. Tests that spawn the MCP server use the committed `data/sample`.

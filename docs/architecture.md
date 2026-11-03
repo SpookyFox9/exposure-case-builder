@@ -28,7 +28,7 @@ So the same findings are presented as two linked views: **cases** (risk) and **f
         |
   service.py  Workspace: every tool answer as capped JSON
         |
-  server.py   stdio MCP server (8 tools)  <---- Claude Code + skills/exposure-case/SKILL.md
+  server.py   stdio MCP server (9 tools)  <---- Claude Code + skills/exposure-case/SKILL.md
 ```
 
 ## Modules and responsibilities
@@ -39,6 +39,7 @@ So the same findings are presented as two linked views: **cases** (risk) and **f
 | `cluster` | Cases: one per patch family, one per other plugin; info findings excluded |
 | `fixes` | Fix packages: normalized CPE product plus fix type read from the solution verb; per-action and contained impact |
 | `coverage` | An additive greedy order over fix packages by hosts newly brought to zero urgent findings; the score rank is untouched. Findings are disjoint across packages, so the overlap that matters is hosts (see "Why these choices") |
+| `baseline`, `trend`, `trend_view` | Optional trend diff: load and validate an earlier export, compare two pulls by finding id plus asset, plugin and port, and answer as counts or pages of ids. Read-only; absence is never reported as a fix |
 | `links` | Two-way links with shares; refuses to build if the two views disagree about which findings exist |
 | `scoring` | The only place weights live; ages anchored to the data, not the clock |
 | `timeline`, `reconcile` | Dated events from Tenable's own dates; a trust check against Tenable's plugin counts |

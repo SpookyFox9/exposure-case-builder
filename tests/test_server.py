@@ -14,7 +14,15 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 SAMPLE = Path(__file__).resolve().parent.parent / "data" / "sample"
 TIMEOUT_S = 90
 
-READ_ONLY_TOOLS = {"fleet_summary", "case_queue", "fix_queue", "case_file", "fix_package", "findings"}
+READ_ONLY_TOOLS = {
+    "fleet_summary",
+    "case_queue",
+    "fix_queue",
+    "case_file",
+    "fix_package",
+    "findings",
+    "trend_diff",
+}
 WRITE_TOOLS = {"export", "record_disposition"}
 
 

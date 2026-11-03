@@ -54,9 +54,11 @@ uv run python scripts/fetch_tenable.py --out data/raw/<name>
 
 and point `EXPOSURE_CASE_DATA` at `data/raw/<name>`. `playbooks/exposure-case-playbook.md` walks through setup, a triage session, how to read the numbers, and troubleshooting.
 
-**MCP tools.** Read-only: `fleet_summary`, `case_queue` (single-vulnerability *threats* and patch *backlogs* as two lists, so backlogs cannot bury threats), `fix_queue` (ranked by score, or `order="coverage"` for a greedy heuristic order by hosts newly brought to zero urgent findings), `case_file`, `fix_package`, and `findings` (the real finding IDs behind a case, to cite). Local writes, each needing `confirm=true`: `export` with `write=true`, and `record_disposition`. No tool accepts a file path.
+**MCP tools.** Read-only: `fleet_summary`, `case_queue` (single-vulnerability *threats* and patch *backlogs* as two lists, so backlogs cannot bury threats), `fix_queue` (ranked by score, or `order="coverage"` for a greedy heuristic order by hosts newly brought to zero urgent findings), `case_file`, `fix_package`, and `findings` (the real finding IDs behind a case, to cite), and `trend_diff` (what changed since an earlier saved pull; see below). Local writes, each needing `confirm=true`: `export` with `write=true`, and `record_disposition`. No tool accepts a file path.
 
 Optional settings (absolute paths only; relative ones are rejected so output never lands in whatever directory the server happened to start in): `EXPOSURE_CASE_EXPORTS` (default `~/.exposure-case/exports`) and `EXPOSURE_CASE_DISPOSITIONS` (default `~/.exposure-case/dispositions.jsonl`). The disposition log is single-writer: run one server per log.
+
+**Trend diff (optional).** Set `EXPOSURE_CASE_BASELINE` to an absolute path of an earlier saved export (same layout as `EXPOSURE_CASE_DATA`) and restart the server. `trend_diff` then reports new, newly visible, fixed-as-recorded, reopened, not-seen and severity-changed findings, with the host overlap beside every count. It is read-only and compares two saved folders; nothing is fetched. A finding that is missing from the later export is **not** reported as fixed, because Tenable recorded no fix. Whether Tenable's finding ids stay the same between pulls is not documented; the answer includes counters that show any sign they do not. To try it offline, `python scripts/make_baseline.py data/sample <new-dir>` writes a clearly labelled **synthetic** earlier pull from the sample (not a real one, not for committing).
 
 ## Outputs
 

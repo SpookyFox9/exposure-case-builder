@@ -28,6 +28,8 @@ tools_exposed:
     description: "One fix package: Tenable's fix actions with what each clears, contained impact, hosts, CVEs and advisories, and the cases it relieves."
   - name: "findings"
     description: "The real finding records behind a case or package, paged, so a narrative can cite genuine finding ids."
+  - name: "trend_diff"
+    description: "Compare with an earlier saved export (set EXPOSURE_CASE_BASELINE): counts per category, host overlap, data-quality counters, or a page of finding ids. A finding missing from the later export is never reported as fixed."
   - name: "export"
     description: "Render a case or package as Markdown or CSV for a ticket; with write=true and confirm=true, save all formats to a fixed local directory."
   - name: "record_disposition"

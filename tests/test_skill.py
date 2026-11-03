@@ -8,6 +8,7 @@ import pytest
 
 from exposure_case.server import build_server
 from exposure_case.service import Workspace
+from exposure_case.trend import CATEGORIES
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "skills" / "exposure-case" / "SKILL.md"
@@ -55,6 +56,7 @@ def test_skill_does_not_invent_tools(tool_names):
         "fleet_summary",
         "record_disposition",
         "risk_accepted",
+        *CATEGORIES,
     }
     unknown = {c for c in candidates if c not in tool_names and c not in known_fields}
     assert not unknown, f"unrecognised identifiers in SKILL.md: {sorted(unknown)}"
@@ -104,3 +106,10 @@ def test_skill_explains_the_coverage_order_and_its_limits():
     assert 'order="coverage"' in text
     for phrase in ("heuristic", "not the shortest plan", "earlier step", "urgent"):
         assert phrase in text.lower() or phrase in text, phrase
+
+
+def test_skill_never_lets_absence_stand_in_for_a_fix():
+    text = " ".join(SKILL.read_text(encoding="utf-8").lower().split())
+    assert "trend_diff" in text
+    for phrase in ("never call a finding fixed", "only `fixed_recorded`", "host overlap"):
+        assert phrase in text, phrase
