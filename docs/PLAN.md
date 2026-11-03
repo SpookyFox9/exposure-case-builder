@@ -158,6 +158,10 @@ Unit tests per module (test first, RED observed), the MCP contract tests (real s
 6. Fork `tenable/cyberagents-exchange`; copy `docs/exchange/mcp-server-listing.md` to `mcp-servers/exposure-case-builder.md`; set `contribution_agreement_date` to your own acceptance time, the final `github_url` and `date_added`; run the Exchange's own `uv run ./validator.py`; open the PR titled `Add listing: Exposure Case Builder` with the acceptance statement in the description.
 7. Pitch (Thu Nov 5, selected teams, about 15 minutes) and awards (Fri Nov 6): build the demo around one live case walk-through on the sample.
 
+## Key dates (organizers' message, pasted by the user 2026-11-03; all times ET)
+
+Registration and rosters closed Mon Nov 2, 11:59 PM. Tutorial on Zoom Tue Nov 3, 11 AM (passed). **Wed Nov 4, 2 PM: open the PR to the CyberAgents Exchange.** Wed Nov 4, 4 PM: teams selected for pitch day are emailed. Thu Nov 5: pitch day for selected teams (details to follow). Fri Nov 6, 11 AM: awards on Zoom. Links given: how to submit (exchange.tenable.com/contributing/), rules (exchange.tenable.com/swarm-global-rules-nov2026/). Whether the user registered before the cutoff is theirs to confirm.
+
 ## Verified facts about the competition (2026-11-02)
 
 - Rules (exchange.tenable.com/swarm-global-rules-nov2026): teams of 1-3; one submission per team, to the CyberAgents Exchange, per its contribution guidelines; judges are a panel of Tenable (possibly Anthropic) staff choosing 1st-3rd place with **no published criteria or weights**; no demo, video or deck requirement is stated; pre-existing code and data restrictions are not addressed (this repo's first commit was 12:51 ET Nov 2, after the 11:00 ET kickoff); BYOT; MIT preferred. Prizes: $10,000 of Anthropic platform credits ($5,000 / $3,000 / $2,000), EXPOSURE 2027 passes, patches, featured Exchange placement. Contest period Nov 2 11:00 ET to the awards stream Nov 6.
@@ -173,7 +177,7 @@ Unit tests per module (test first, RED observed), the MCP contract tests (real s
 ## Unverified (do not assume)
 
 - The Contribution Agreement text, SECURITY.md, and the submission-builder skill's checks (only a model summary of its SKILL.md was available).
-- Whether the Submission Deadline is Wed Nov 4 (assumed) or later.
+- Whether Wed Nov 4, 2 PM ET ("open your PR to the CyberAgents Exchange", per the organizers' key-dates message the user pasted on 2026-11-03) is a hard cutoff or only when the PR window opens. The message does not use the words "Submission Deadline".
 - The minimum Tenable role for exports is now documented (Basic [16] + Can View on assets, per developer.tenable.com export reference); the workbench call's minimum was not checked.
 - The cause of the 41 count mismatches against Tenable's own numbers.
 - Whether MCP elicitation is supported by the client (not used; `confirm` plus the client prompt is the gate).
