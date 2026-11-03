@@ -36,10 +36,29 @@ PLUGIN_KEYS = (
     "has_patch",
     "unsupported_by_vendor",
     "checks_for_default_account",
+    # What the fix packages, scores and timeline read (public plugin data; never plugin output).
+    "solution",
+    "cpe",
+    "cve",
+    "see_also",
+    "has_workaround",
+    "patch_publication_date",
+    "cvss3_base_score",
+    "epss_score",
 )
+VPR_KEYS = ("score", "vpr_severity", "on_cisa_kev", "exploit_code_maturity")
 PORT_KEYS = ("port", "protocol", "service")
 SCAN_KEYS = ("uuid", "started_at")
-TOP_KEYS = ("finding_id", "state", "severity", "first_found", "last_found")
+TOP_KEYS = (
+    "finding_id",
+    "state",
+    "severity",
+    "first_found",
+    "last_found",
+    "last_fixed",
+    "resurfaced_date",
+    "time_taken_to_fix",
+)
 
 
 def _pick(obj: Any, keys: tuple[str, ...]) -> dict:
@@ -50,6 +69,9 @@ def _trim(record: dict) -> dict:
     out = _pick(record, TOP_KEYS)
     out["asset"] = _pick(record.get("asset"), ASSET_KEYS)
     out["plugin"] = _pick(record.get("plugin"), PLUGIN_KEYS)
+    vpr = _pick((record.get("plugin") or {}).get("vpr"), VPR_KEYS)
+    if vpr:
+        out["plugin"]["vpr"] = vpr
     out["port"] = _pick(record.get("port"), PORT_KEYS)
     out["scan"] = _pick(record.get("scan"), SCAN_KEYS)
     return out
