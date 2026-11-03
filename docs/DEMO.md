@@ -1,0 +1,56 @@
+# Demo script (about 15 minutes, one live case)
+
+Everything below runs on the committed sample (`data/sample`: 154 hosts, 1,125 findings, 50 plugins; fake, masked tenant data). Figures were read from the sample on 2026-11-03. Rehearse once with the real client before the pitch; the contract tests do not prove the narrative reads well.
+
+## Setup (before the room)
+
+```bash
+uv sync --frozen
+uv run python scripts/make_baseline.py data/sample <new-dir>    # SYNTHETIC earlier pull, for the trend step only
+claude mcp add exposure-case \
+  --env EXPOSURE_CASE_DATA=<abs path to data/sample> \
+  --env EXPOSURE_CASE_BASELINE=<abs path to the new-dir> \
+  -- uv run --directory <abs path to this repo> python -m exposure_case.server
+```
+
+Keep `export` and `record_disposition` on "ask" in the client's tool permissions. If a real second pull exists by then (`scripts/fetch_tenable.py` again), use it as the baseline instead and drop the synthetic caveat.
+
+## 0. Open honestly (1 min)
+
+Say first what Tenable already has, then the difference. Per Tenable's documentation (read 2026-11-03, not tested on a live tenant): the **Solutions view** lists recommended fixes with affected assets, CVE counts and VPR; **Exposure Response** groups findings by saved query and asset tag and can open Jira or ServiceNow tickets; **Hexa AI** has an MCP server. Those need a Tenable One (or Lumin) licence. This project works from a plain saved Vulnerability Management export and does four things differently: it lists each distinct fix action with what *it alone* clears, it shows a documented score with its breakdown, it hands an engineer a file that needs no Tenable login, and it never changes anything in Tenable.
+
+## 1. The size of the problem (1 min) - `fleet_summary`
+
+154 hosts, 1,087 active findings (32 critical, 125 high), 24 on the CISA KEV list, 43 cases and 33 fix packages. Mention the data-quality notes.
+
+## 2. Two lists, on purpose (2 min) - `case_queue`
+
+Threats (one vulnerability each) and backlogs (a whole patch family) come back separately so a large backlog cannot bury an exploited vulnerability. Top threat: **Bash Remote Code Execution (Shellshock)**, 5 hosts, score 70.8. Top backlog: **Windows : Microsoft Bulletins**, 14 hosts, score 80.9. Open the Shellshock case: `case_file`, then `findings` for real finding ids, and let Claude write the short cited narrative. Point at the score breakdown: a fixed weighted sum, no model.
+
+## 3. The engineer's view (3 min) - `fix_queue`, `fix_package`
+
+Show the top package, **OpenSSH (patch)**: 21 hosts and **10 distinct Tenable actions** ("Upgrade to OpenSSH version 10.4 or later", "... 10.5 ...", and so on). Each action has its own row with what it alone clears. A human can see these are cumulative; the tool does not claim it, because Tenable's data does not say one update replaces another. This is the part to dwell on. Then `export` the package as Markdown (approve the write): a ticket body an engineer can use without a Tenable login.
+
+## 4. What first, if hosts are the goal (2 min) - `fix_queue` with `order="coverage"`
+
+Step 1 is the OpenSSH patch package: it brings 8 of the 67 hosts with an urgent finding to zero, but it means 10 actions. Step 2, **OpenSSH (configuration)**, is one action and brings 19 more hosts to zero (27 of 67 in total). Say plainly that this is a heuristic, not the shortest plan, that "cleared" means no urgent finding in the export (urgent = critical, KEV, exploited by malware or a public exploit), and that a step is not an effort estimate: read the actions column. On the full competition export (private) the first step is 93 distinct updates for 8 hosts, which is why that column is there.
+
+## 5. What changed since last time (2 min) - `trend_diff`
+
+State first that this baseline is **synthetic** (the answer says so too). Show the counts: new since baseline 13, newly visible 51, fixed as recorded 20, reopened 46, not seen (host rescanned) 62, severity raised 2 and lowered 6, with host overlap (145 of 154) beside them. Then the rule: a finding missing from the later export is never reported as fixed, because Tenable recorded no fix. Say that finding-id stability across real pulls is undocumented and untested here, and that `id_reuse` and `possible_rekeys` are the counters that would show it.
+
+## 6. The decision (1 min) - `record_disposition`
+
+Tell Claude a decision and a note; it reads the entry back and records it only after you confirm. One appended line in a local log; nothing else changes.
+
+## Do not claim
+
+- That Tenable lacks fix grouping, tickets or an MCP server.
+- That the coverage order is optimal, or that a step is a measure of effort.
+- That anything missing from a later pull was fixed.
+- That the trend diff has been proven on two real pulls (unless it has been by then).
+- Anything about who owns a host: the tenant has no owner or tag data.
+
+## If something fails
+
+The server, the skill and the data are all local. If the client misbehaves, `uv run pytest tests/test_server.py` shows the same tools answering over the real protocol, and `exposure_case.service.Workspace` can be called from a Python shell with the same arguments. If the synthetic baseline is missing, skip step 5 rather than improvise numbers.

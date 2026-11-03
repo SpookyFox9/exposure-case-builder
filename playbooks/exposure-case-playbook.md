@@ -33,9 +33,13 @@ whatever directory the server was started from.
    why it ranks here, the evidence, what limits it, how Tenable says to fix it, what else to check.
 3. Ask: *"What should engineers do first?"* Claude shows the **fix queue**. A package groups findings by how they
    are fixed, such as "apply updates to OpenSSH".
-4. Ask for a handoff: Claude renders the package as Markdown for a ticket. Saving files (`exports/`) needs your
+4. Optional: ask *"In what order do we get hosts free of urgent findings?"* Claude shows the fix queue in
+   **coverage order**. It is a heuristic, and a step can mean many actions, so read the actions count next to the
+   hosts cleared. Ask *"What changed since the last pull?"* only if the operator configured a baseline; Claude
+   shows the trend counts with the host overlap, and never calls a missing finding fixed.
+5. Ask for a handoff: Claude renders the package as Markdown for a ticket. Saving files (`exports/`) needs your
    explicit yes.
-5. Tell Claude your decision (`assigned`, `risk-accepted`, `false-positive` or `needs-info`), your name and a
+6. Tell Claude your decision (`assigned`, `risk-accepted`, `false-positive` or `needs-info`), your name and a
    note. Claude reads it back and records it only after you confirm. The next queue can hide decided items.
 
 ## 3. Reading the numbers
