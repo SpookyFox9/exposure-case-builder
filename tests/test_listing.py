@@ -194,3 +194,9 @@ def test_no_template_leftovers(listing):
     text = json.dumps(meta)
     assert "your-github-username" not in text and "Your MCP Server Name" not in text
     assert meta["date_added"] != "2026-01-01"
+
+
+def test_listing_describes_the_coverage_order_without_overclaiming(listing):
+    _, tools, _ = listing
+    fix_queue = next(t for t in tools if t["name"] == "fix_queue")["description"].lower()
+    assert "coverage" in fix_queue and "heuristic" in fix_queue

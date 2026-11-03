@@ -38,6 +38,7 @@ So the same findings are presented as two linked views: **cases** (risk) and **f
 | `ingest` | Read saved chunks; validate and bound everything (file, total and record limits, known severities and states, tolerant optional fields); produce frozen `FindingRecord`s |
 | `cluster` | Cases: one per patch family, one per other plugin; info findings excluded |
 | `fixes` | Fix packages: normalized CPE product plus fix type read from the solution verb; per-action and contained impact |
+| `coverage` | An additive greedy order over fix packages by hosts newly brought to zero urgent findings; the score rank is untouched. Findings are disjoint across packages, so the overlap that matters is hosts (see "Why these choices") |
 | `links` | Two-way links with shares; refuses to build if the two views disagree about which findings exist |
 | `scoring` | The only place weights live; ages anchored to the data, not the clock |
 | `timeline`, `reconcile` | Dated events from Tenable's own dates; a trust check against Tenable's plugin counts |
@@ -69,6 +70,7 @@ So the same findings are presented as two linked views: **cases** (risk) and **f
 - **Two views, not one.** A single risk-centred list buries the fix; a single fix-centred list hides the threats. Linking them lets each reader start from their own question.
 - **Two queue lists.** KEV is common, so large patch backlogs saturate the exploit component and would outrank an exploited single vulnerability. Separate lists keep both visible without changing the approved weights.
 - **Fix type from the solution's opening verb, not `has_patch`.** `has_patch` is true for 98% of plugins, including "Disable J-Web". The verb is the usable signal.
+- **Coverage order counts hosts, not findings or cases.** Each finding is in exactly one package, so finding-level marginal coverage is a plain sum in any order. Case-level overlap was rejected: backlog cases span many packages, so nearly every step would clear no case and the tie-break would decide. A host is clear only when every package that touches it is applied (an all-of condition, not classic set cover), so a package's gain can rise as others are applied and the greedy has no approximation guarantee. Gains are updated only for packages that share a host with the one just placed. The order is a heuristic and the tool answer says so.
 - **Stdlib engine, one runtime dependency.** The engine is small enough that a library would add more surface than it removes; `mcp` is needed to speak the protocol. pyTenable was evaluated and declined (`PRIOR_ART.md`).
 - **A save-then-analyse split.** The fetch script writes files; everything else reads them. The analysis is reproducible, offline and testable against a committed sample.
 

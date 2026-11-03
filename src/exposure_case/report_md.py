@@ -112,6 +112,25 @@ def _package_header(view: PackageView) -> list[str]:
         ),
         "",
         f"**Why it ranks here:** {reasons}.",
+        *_coverage_line(view),
+    ]
+
+
+def _coverage_line(view: PackageView) -> list[str]:
+    """One paragraph on the package's place in the coverage order; nothing if it has no urgent findings."""
+    step = view.coverage
+    if step is None:
+        return []
+    more = plural(step.hosts_cleared, "more host")
+    return [
+        "",
+        (
+            f"**Coverage order:** step {step.step}. Applying every listed action here and in each earlier step "
+            f"brings {more} to zero urgent findings, {step.cumulative_hosts_cleared} of "
+            f"{step.urgent_hosts_total} in all. Urgent means critical, on the CISA KEV list, exploited by malware "
+            "or with a public exploit. This is a heuristic order, not the shortest plan, and it counts only what is "
+            "in this export."
+        ),
     ]
 
 

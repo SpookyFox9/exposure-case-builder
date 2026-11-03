@@ -54,7 +54,7 @@ uv run python scripts/fetch_tenable.py --out data/raw/<name>
 
 and point `EXPOSURE_CASE_DATA` at `data/raw/<name>`. `playbooks/exposure-case-playbook.md` walks through setup, a triage session, how to read the numbers, and troubleshooting.
 
-**MCP tools.** Read-only: `fleet_summary`, `case_queue` (single-vulnerability *threats* and patch *backlogs* as two lists, so backlogs cannot bury threats), `fix_queue`, `case_file`, `fix_package`, and `findings` (the real finding IDs behind a case, to cite). Local writes, each needing `confirm=true`: `export` with `write=true`, and `record_disposition`. No tool accepts a file path.
+**MCP tools.** Read-only: `fleet_summary`, `case_queue` (single-vulnerability *threats* and patch *backlogs* as two lists, so backlogs cannot bury threats), `fix_queue` (ranked by score, or `order="coverage"` for a greedy heuristic order by hosts newly brought to zero urgent findings), `case_file`, `fix_package`, and `findings` (the real finding IDs behind a case, to cite). Local writes, each needing `confirm=true`: `export` with `write=true`, and `record_disposition`. No tool accepts a file path.
 
 Optional settings (absolute paths only; relative ones are rejected so output never lands in whatever directory the server happened to start in): `EXPOSURE_CASE_EXPORTS` (default `~/.exposure-case/exports`) and `EXPOSURE_CASE_DISPOSITIONS` (default `~/.exposure-case/dispositions.jsonl`). The disposition log is single-writer: run one server per log.
 

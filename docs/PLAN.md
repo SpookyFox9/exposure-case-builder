@@ -81,7 +81,7 @@ Ages are measured from the newest `last_found` in the data, never the wall clock
 |---|---|---|
 | `fleet_summary` | no | Totals, severity, case and package counts, KEV, data-quality notes |
 | `case_queue` | no | Ranked cases as `threats` and `backlogs` (or one kind); `hide_dispositioned` reports how many it hid |
-| `fix_queue` | no | Ranked fix packages |
+| `fix_queue` | no | Ranked fix packages; `order="coverage"` lists them in the greedy host-clearing order (heuristic; the score rank is unchanged) |
 | `case_file` | no | One case: score breakdown, facts, linked packages, vulnerabilities, hosts, timeline, limitations, disposition |
 | `fix_package` | no | One package: Tenable's actions with what each clears, contained impact, hosts, CVEs, advisories, cases |
 | `findings` | no | Real finding records behind a case or package, paged, so a narrative cites genuine ids |
@@ -102,7 +102,20 @@ Tenable already groups fixes (Solutions view), opens Jira/ServiceNow tickets and
 6. **Decision record.** The append-only disposition log stays; Tenable documents only ticket status.
 7. **Threats versus backlogs, linked both ways.** Keep the two queues and the shares between cases and packages.
 
-Claims to avoid: that Tenable lacks fix grouping, ticketing or an MCP server. Claims to verify before making: anything about how Tenable forms a solution (check `GET /solutions` on a Lumin tenant if one is available). Candidate gaps to close, not built: marginal-coverage ordering across packages (the Chokepoint family does this), and a trend diff against the previous pull (Patch Shepherd does this).
+### Coverage order (built 2026-11-03)
+
+Status: built test-first (RED seen for the module, the service wiring, the exports, the scale test and the doc drift guards). Reviews run: code-reviewer (2 HIGH: quadratic cost, unfinished scope; both fixed), python-reviewer (approve; renames, keyword arguments, `Literal` schema, private attribute fixed), security-reviewer (no findings above LOW). Incremental gain updates replaced the full recomputation: 1,000 packages x 200 hosts out of 3,000 went from about 10 s to about 1.6 s, and a test checks the incremental order against a from-scratch recomputation on 200 random cases. Not done: moving row builders out of `service.py` (about 440 lines, over the 400 guideline, under the 800 maximum); a separate follow-up.
+
+A second, additive ordering of fix packages, `coverage.py`. Findings are disjoint across packages, so finding-level marginal coverage is just a sum; the real overlap is **hosts** (a host has urgent findings in several packages). Case-level overlap was rejected: backlog cases span many packages, so nearly every step would clear zero cases and the tie-break would decide.
+
+- An **urgent finding** is active, non-info, and critical, on CISA KEV, exploited by malware, or with a public exploit (one documented constant).
+- Greedy, deterministic: at each step pick the remaining package with the best key: (1) most hosts newly at zero urgent findings, (2) most urgent findings removed, (3) fewest distinct fix actions, (4) package id. Effort is a tie-break only, never a divisor.
+- Packages with no urgent findings get no step (`coverage: null`).
+- Additive: the score rank is unchanged. `fix_queue` gains `order="score"|"coverage"` (default score) and a `coverage` object per row; `fix_package` gains `coverage`; the exports carry it.
+- Wording: "applying every listed action in this package"; never that one update replaces another. "Cleared" means no urgent finding in this export, not that the host is secure. A greedy order is a heuristic, not the shortest plan; all-of host clearance is not classic set cover and has no approximation guarantee.
+- Tests first: `tests/test_coverage.py` (empty, single, shared host, tie-breaks, input-order independence, FIXED and info excluded, sum of cleared hosts equals urgent hosts, frozen), then `test_service.py`, `test_server.py`, golden Markdown and an e2e on `data/sample`. The security-reviewer must run (new tool parameter).
+
+Claims to avoid: that Tenable lacks fix grouping, ticketing or an MCP server. Claims to verify before making: anything about how Tenable forms a solution (check `GET /solutions` on a Lumin tenant if one is available). Candidate gaps to close, not built: a trend diff against the previous pull (Patch Shepherd does this).
 
 ## Testing strategy
 

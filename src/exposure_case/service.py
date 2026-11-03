@@ -24,6 +24,7 @@ from .case import (
 )
 from .cluster import Cluster, build_clusters
 from .common import worst_severity
+from .coverage import COVERAGE_NOTE, ORDERS, coverage_order, in_coverage_order
 from .export import (
     ExportError,
     case_hosts_csv,
@@ -128,6 +129,8 @@ class Workspace:
         self.links: Links = link_cases_and_fixes(cases, packages)
         self.ranked_cases: tuple[RankedCluster, ...] = rank_clusters(cases, self.fleet, self.as_of)
         self.ranked_packages: tuple[RankedPackage, ...] = rank_packages(packages, self.fleet, self.as_of)
+        self._coverage_steps = coverage_order(packages)
+        self._coverage = {s.package_id: s for s in self._coverage_steps}
         self._cases = {r.cluster.cluster_id: r for r in self.ranked_cases}
         self._packages = {r.package.package_id: r for r in self.ranked_packages}
         self._reconciliation = reconcile(records, plugin_info).to_dict() if plugin_info else None
@@ -172,7 +175,9 @@ class Workspace:
 
     def _package_view(self, package_id: str) -> PackageView:
         if package_id not in self._package_views:
-            self._package_views[package_id] = build_package_view(self._package(package_id), self.links, self.as_of)
+            self._package_views[package_id] = build_package_view(
+                self._package(package_id), self.links, self.as_of, self._coverage.get(package_id)
+            )
         return self._package_views[package_id]
 
     def _case(self, case_id: str) -> RankedCluster:
@@ -274,13 +279,21 @@ class Workspace:
         items, hidden_count = rows(QUEUE_KINDS[kind])
         return {"kind": kind, "items": items, "hidden_dispositioned": hidden_count, "as_of": as_of}
 
-    def fix_queue(self, top_n: int = 10, hide_dispositioned: bool = False) -> dict[str, Any]:
+    def fix_queue(self, top_n: int = 10, hide_dispositioned: bool = False, order: str = "score") -> dict[str, Any]:
         top_n = _int(top_n, "top_n", 1, MAX_TOP_N)
+        if not isinstance(order, str) or order not in ORDERS:
+            raise ServiceError(f"order must be one of: {', '.join(ORDERS)}")
         latest = self._latest()
-        visible = [r for r in self.ranked_packages if not (hide_dispositioned and r.package.package_id in latest)]
+        ranked = (
+            in_coverage_order(self.ranked_packages, self._coverage_steps)
+            if order == "coverage"
+            else self.ranked_packages
+        )
+        visible = [r for r in ranked if not (hide_dispositioned and r.package.package_id in latest)]
         items = [self._package_row(r, position, latest) for position, r in enumerate(visible[:top_n], start=1)]
         hidden = len(self.ranked_packages) - len(visible)
-        return {"items": items, "hidden_dispositioned": hidden, "as_of": self.as_of.isoformat()}
+        answer = {"items": items, "order": order, "hidden_dispositioned": hidden, "as_of": self.as_of.isoformat()}
+        return {**answer, "coverage_note": COVERAGE_NOTE} if order == "coverage" else answer
 
     def _package_row(self, ranked: RankedPackage, position: int, latest: dict[str, dlog.Disposition]) -> dict[str, Any]:
         p = ranked.package
@@ -299,8 +312,13 @@ class Workspace:
             "kev_findings": p.impact.kev_findings,
             "contained_critical_share": round(p.impact.critical_share, 4),
             "why": list(priority_reasons(ranked.score)),
+            "coverage": self._coverage_dict(p.package_id),
             "disposition": _disposition_brief(latest.get(p.package_id)),
         }
+
+    def _coverage_dict(self, package_id: str) -> dict[str, Any] | None:
+        step = self._coverage.get(package_id)
+        return step.to_dict() if step else None
 
     # --- detail ---
 

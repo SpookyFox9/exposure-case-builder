@@ -21,7 +21,7 @@ tools_exposed:
   - name: "case_queue"
     description: "Ranked cases as two lists, single-vulnerability threats and patch backlogs, each row explaining why it ranks where it does."
   - name: "fix_queue"
-    description: "Ranked fix packages (a product plus a kind of fix) with what each contains and how many distinct actions it spans."
+    description: "Ranked fix packages (a product plus a kind of fix) with what each contains and how many distinct actions it spans. order=coverage lists them in a greedy, heuristic order by hosts newly brought to zero urgent findings; the score rank is unchanged."
   - name: "case_file"
     description: "One case: score breakdown, facts, the fix packages that address it, top vulnerabilities with CVEs, hosts, timeline, limitations and any recorded disposition."
   - name: "fix_package"

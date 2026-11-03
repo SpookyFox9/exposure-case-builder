@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .common import SEVERITY_ORDER, plural, worst_severity
+from .coverage import CoverageStep
 from .fixes import FixPackage, HostLine, RankedPackage, classify_fix, host_lines
 from .ingest import FindingRecord
 from .links import Link, Links
@@ -223,6 +224,7 @@ class PackageView:
     cases: tuple[Link, ...]
     priority_reasons: tuple[str, ...]
     as_of: datetime
+    coverage: CoverageStep | None = None  # this package's place in the coverage order, if it has urgent findings
 
     def to_dict(self, max_hosts: int | None = None) -> dict:
         return {
@@ -230,6 +232,7 @@ class PackageView:
             "score": self.score.to_dict(),
             "package": self.package.to_dict(max_hosts),
             "cases": [c.to_dict() for c in self.cases],
+            "coverage": self.coverage.to_dict() if self.coverage else None,
             "priority_reasons": list(self.priority_reasons),
             "scope_note": SCOPE_NOTE,
             "limitations": list(LIMITATIONS),
@@ -238,7 +241,9 @@ class PackageView:
         }
 
 
-def build_package_view(ranked: RankedPackage, links: Links, as_of: datetime) -> PackageView:
+def build_package_view(
+    ranked: RankedPackage, links: Links, as_of: datetime, coverage: CoverageStep | None = None
+) -> PackageView:
     return PackageView(
         rank=ranked.rank,
         score=ranked.score,
@@ -246,4 +251,5 @@ def build_package_view(ranked: RankedPackage, links: Links, as_of: datetime) -> 
         cases=links.cases_for(ranked.package.package_id),
         priority_reasons=priority_reasons(ranked.score),
         as_of=as_of,
+        coverage=coverage,
     )

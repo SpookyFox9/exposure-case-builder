@@ -97,3 +97,10 @@ def test_playbook_covers_setup_and_safety():
 def test_playbook_never_asks_for_keys_in_the_repo():
     text = PLAYBOOK.read_text(encoding="utf-8").lower()
     assert "outside the repo" in text and ".env" not in text
+
+
+def test_skill_explains_the_coverage_order_and_its_limits():
+    text = SKILL.read_text(encoding="utf-8")
+    assert 'order="coverage"' in text
+    for phrase in ("heuristic", "not the shortest plan", "earlier step", "urgent"):
+        assert phrase in text.lower() or phrase in text, phrase

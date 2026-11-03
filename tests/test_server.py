@@ -46,6 +46,8 @@ async def scenario(tmp_path: Path) -> dict:
         case_id = out["queue"]["threats"][0]["case_id"]
         package_id = out["fix_queue"]["items"][0]["package_id"]
         out["case_id"], out["package_id"] = case_id, package_id
+        out["fix_coverage"] = data(await session.call_tool("fix_queue", {"top_n": 3, "order": "coverage"}))
+        out["fix_bad_order"] = await session.call_tool("fix_queue", {"order": "risk"})
         out["case"] = data(await session.call_tool("case_file", {"case_id": case_id, "max_hosts": 2}))
         out["package"] = data(await session.call_tool("fix_package", {"package_id": package_id, "max_actions": 2}))
         out["findings"] = data(await session.call_tool("findings", {"item_id": case_id, "limit": 3}))
@@ -223,6 +225,7 @@ def test_enum_arguments_show_their_values_in_the_schema(run):
         return run["tools"][tool].input_schema["properties"][name]
 
     assert set(prop("case_queue", "kind")["enum"]) == {"both", "threats", "backlogs"}
+    assert set(prop("fix_queue", "order")["enum"]) == {"score", "coverage"}
     assert set(prop("export", "format")["enum"]) == {"markdown", "hosts_csv", "actions_csv", "json"}
     assert set(prop("record_disposition", "disposition")["enum"]) == {
         "assigned",
@@ -230,6 +233,14 @@ def test_enum_arguments_show_their_values_in_the_schema(run):
         "false-positive",
         "needs-info",
     }
+
+
+def test_fix_queue_coverage_order_works_over_mcp_and_rejects_unknown_orders(run):
+    answer = run["fix_coverage"]
+    assert answer["order"] == "coverage" and "heuristic" in answer["coverage_note"]
+    assert answer["items"][0]["coverage"]["step"] == 1
+    assert "coverage_note" not in run["fix_queue"] and run["fix_queue"]["order"] == "score"
+    assert run["fix_bad_order"].is_error
 
 
 def test_instructions_treat_tool_text_as_data_and_admit_the_confirm_limit(run):

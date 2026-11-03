@@ -37,7 +37,12 @@ analyst decides.** You report facts and evidence, never verdicts.
    (for example BlueKeep) and patch *backlogs* (a whole OS family). Backlogs would otherwise bury threats.
    Present both, each with its "why it ranks here" reasons.
 3. `fix_queue` when the question is "what should engineers do first". Packages group findings by how they are
-   fixed.
+   fixed. Use `order="coverage"` when the question is "in what order do we get hosts free of urgent findings":
+   it lists packages greedily by hosts newly brought to zero urgent findings (critical, CISA KEV, exploited by
+   malware or a public exploit). Each row's `coverage` object gives the step. Say it plainly: this is a heuristic,
+   not the shortest plan; the figures assume every earlier step is applied (including any package hidden as
+   dispositioned); "cleared" means no urgent finding in this export, not that a host is secure; and Tenable's
+   data does not say one update replaces another. `position` follows the coverage order; `rank` stays the score.
 4. For the case the analyst picks: `case_file`, then `findings` (page through if needed) to get real IDs.
    Look at `facts`, `score.components`, `fixes` (which packages address it, with shares), top
    `vulnerabilities`, `timeline` and `limitations`.
