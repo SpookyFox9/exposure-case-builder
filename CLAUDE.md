@@ -8,7 +8,7 @@ Read `docs/PLAN.md` first. It has the full plan, the decisions already made, the
 
 Exposure Case Builder turns Tenable vulnerability findings into **cases** (what is risky) and **fix packages** (what to do and what it clears), ranked so a human can see what to fix first, each with the evidence and an export (Markdown, CSV, JSON) an engineer on another team can act on. Claude writes the narrative and the human analyst records the disposition. It is being built for SWARM Global (Nov 2-6, 2026) and will be listed on the CyberAgents Exchange (one MCP-server listing; see `docs/exchange/`).
 
-History: the project started as an insider-threat case builder (CERT data) and pivoted on 2026-11-02 because the competition tenant has no user-activity telemetry. The insider code is in git history (commit `56f8788` and earlier). The directory name `insider-case-builder/` is a leftover; the package is `exposure_case`.
+History: the project started as an insider-threat case builder (CERT data) and pivoted on 2026-11-02 because the competition tenant has no user-activity telemetry. The insider code is in git history (commit `56f8788` and earlier). The directory was named `insider-case-builder/` until 2026-11-03 and is now `exposure-case-builder/`, matching the GitHub repository; the package is `exposure_case`.
 
 ## Commands
 

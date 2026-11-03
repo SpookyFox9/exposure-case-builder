@@ -38,7 +38,7 @@ An MCP server and Claude Code skill that turn a Tenable Vulnerability Management
 ## Repo layout
 
 ```
-insider-case-builder/               (directory name is a leftover; package is exposure_case)
+exposure-case-builder/               (renamed from insider-case-builder on 2026-11-03; package is exposure_case)
 ├── LICENSE (MIT), README.md, CLAUDE.md, pyproject.toml, uv.lock
 ├── .githooks/pre-commit            gitleaks, then scripts/check_all.sh
 ├── .github/workflows/ci.yml        scripts/check_all.sh on Python 3.10 and 3.12; actions pinned to commits
@@ -149,6 +149,8 @@ Unit tests per module (test first, RED observed), the MCP contract tests (real s
 | Submit | Live Claude Code session; public repo; tag v0.1.0; Exchange PR | **open, needs the user** |
 
 ## Submission checklist (needs the user)
+
+State on 2026-11-03: employer approval obtained (the user's statement; the Contribution Agreement still has to be read and its acceptance time recorded by the submitter). The team is registered; its registration text describes the earlier idea, so say so in the PR description (the rules and contributing pages say nothing about changing a project after registration). `origin` is `github.com/SpookyFox9/exposure-case-builder` and was last pushed at `d476dca`; the later commits are local until pushed, and the Exchange reviews the pushed repository. Tag `v0.1.0` exists on `51bc047`, before the coverage order, trend diff and sample fix; the Exchange does not need a tag, so either leave it or make a new release (`v0.2.0`, which needs a version bump) rather than rewrite a published tag.
 
 1. Confirm eligibility: the rules require registering at info.tenable.com/2026-SWARM-GLOBAL.html before it closed (Nov 1), joining the Discord, and every contributing member accepting the CyberAgents Contribution Agreement. Read the agreement (not fetched here): it covers licence, authority including "any required employer permission", and non-infringement.
 2. Ask on Discord for the **Submission Deadline** (the rules use the term but never define it) and how to **notify Tenable** of the submission.
