@@ -147,6 +147,14 @@ class TenableClient:
             raise FetchError(f"{method} {path} failed: {type(exc).__name__}") from None
 
 
+def _remove_quietly(path: Path) -> None:
+    """Best-effort delete for cleanup; never let it mask the error being handled (Linux raises ENOTDIR)."""
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        log.debug("could not remove %s during cleanup", path.name, exc_info=True)
+
+
 def _write_json(path: Path, data: Any) -> None:
     """Write via a temp file and ``os.replace`` so a failure never leaves a half-written file."""
     tmp = path.with_name(f".{path.name}.tmp")
@@ -159,7 +167,7 @@ def _write_json(path: Path, data: Any) -> None:
     except OSError as exc:
         raise FetchError(f"cannot write {path.name}: {type(exc).__name__}") from None
     finally:
-        tmp.unlink(missing_ok=True)
+        _remove_quietly(tmp)
 
 
 def _validated_chunk_ids(status: dict) -> list[int]:
@@ -224,10 +232,7 @@ def fetch(
         _write_json(out_dir / "plugins.json", client.request("GET", PLUGIN_PATH))
     except BaseException:
         shutil.rmtree(out_dir / "chunks", ignore_errors=True)
-        try:
-            (out_dir / "plugins.json").unlink(missing_ok=True)
-        except OSError:  # e.g. a parent path is a file on Linux; never mask the original error
-            log.debug("could not remove plugins.json during cleanup", exc_info=True)
+        _remove_quietly(out_dir / "plugins.json")
         if created:
             shutil.rmtree(out_dir, ignore_errors=True)
         raise
