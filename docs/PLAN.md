@@ -90,6 +90,20 @@ Ages are measured from the newest `last_found` in the data, never the wall clock
 
 No tool accepts a file path. `confirm` is a convention: the client's tool-permission prompt is the real gate.
 
+## Differentiation from Tenable's own features (decided 2026-11-03)
+
+Tenable already groups fixes (Solutions view), opens Jira/ServiceNow tickets and ships an MCP server (Hexa AI), all on Tenable One / Lumin licensing; see `docs/PRIOR_ART.md`. Every change is checked against these guardrails, which are what the build offers that Tenable's documented features do not:
+
+1. **Per-action accounting.** Each fix package lists every distinct Tenable action and what *it alone* clears. Tenable's docs never say how a solution is formed and warn that "remediating one may affect other plugins". Keep this visible in the case file, the fix package and the demo.
+2. **Portable handoff.** An export an engineer can act on with no Tenable login and no Lumin license: finding ids, scan uuids, solution text labelled as Tenable's, affected assets. Do not add anything that makes an export depend on the console.
+3. **Plain Vulnerability Management input.** Works from a saved export with ordinary read access (the documented minimum role). Say so in the README; never add a Lumin or Tenable One dependency.
+4. **Open score.** One documented weighted sum with its component breakdown; never replace it with, or hide it behind, a Tenable-computed number. Show VPR as one input.
+5. **Read-only toward Tenable.** No tool changes a Tenable system; the only writes are two local files behind `confirm`. Hexa's MCP server writes tickets, tags and scans.
+6. **Decision record.** The append-only disposition log stays; Tenable documents only ticket status.
+7. **Threats versus backlogs, linked both ways.** Keep the two queues and the shares between cases and packages.
+
+Claims to avoid: that Tenable lacks fix grouping, ticketing or an MCP server. Claims to verify before making: anything about how Tenable forms a solution (check `GET /solutions` on a Lumin tenant if one is available). Candidate gaps to close, not built: marginal-coverage ordering across packages (the Chokepoint family does this), and a trend diff against the previous pull (Patch Shepherd does this).
+
 ## Testing strategy
 
 Unit tests per module (test first, RED observed), the MCP contract tests (real server, real SDK client), an end-to-end flow (fake Tenable -> fetch script -> server -> export -> decision), golden-file tests for the exporters, drift guards (skill, listing, workflow gates), and the standards checker run over this repo. Coverage gate 80% (actual 96% branch). A hash of every export and tool answer on the full real tenant (1,015 items) and on the sample (93) is used to prove behavior-neutral refactors.
