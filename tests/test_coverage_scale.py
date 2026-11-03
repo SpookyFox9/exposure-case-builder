@@ -9,7 +9,8 @@ from exposure_case.coverage import coverage_order
 SCALE_PACKAGES = 1000
 SCALE_HOSTS = 3000
 SCALE_PER_PACKAGE = 200
-TIME_LIMIT_SECONDS = 5.0
+# Guards against a quadratic blow-up (minutes), not micro-timing: about 1 s on a laptop, 7 s on a shared CI runner.
+TIME_LIMIT_SECONDS = 20.0
 
 
 def _stub_package(pid, hosts):

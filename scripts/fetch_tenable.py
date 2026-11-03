@@ -224,7 +224,10 @@ def fetch(
         _write_json(out_dir / "plugins.json", client.request("GET", PLUGIN_PATH))
     except BaseException:
         shutil.rmtree(out_dir / "chunks", ignore_errors=True)
-        (out_dir / "plugins.json").unlink(missing_ok=True)
+        try:
+            (out_dir / "plugins.json").unlink(missing_ok=True)
+        except OSError:  # e.g. a parent path is a file on Linux; never mask the original error
+            log.debug("could not remove plugins.json during cleanup", exc_info=True)
         if created:
             shutil.rmtree(out_dir, ignore_errors=True)
         raise
