@@ -16,7 +16,7 @@ from datetime import datetime
 from .cluster import Cluster
 from .ingest import FindingRecord
 
-# (component, weight). Single source of truth; documented in docs/PLAN.md.
+# (component, weight). Single source of truth; documented in docs/ROADMAP.md.
 WEIGHTS: tuple[tuple[str, int], ...] = (
     ("severity", 30),  # worst active severity
     ("exploit", 25),  # known exploitation / exploit availability

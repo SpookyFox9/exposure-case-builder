@@ -1,6 +1,6 @@
 # Architecture
 
-How Exposure Case Builder is put together and why. The task list and status are in `PLAN.md`.
+How Exposure Case Builder is put together and why. Decisions, the scoring table and the roadmap are in `ROADMAP.md`.
 
 ## Purpose and shape
 

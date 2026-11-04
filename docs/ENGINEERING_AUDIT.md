@@ -23,7 +23,7 @@ Measured with the project's own tools (ruff, black, mypy, bandit, coverage, `scr
 | `python/coding-style`: **black**, isort, ruff, type annotations on all signatures | **black never run** (31 of 42 files unformatted); ruff run only with ad-hoc settings; no annotation gate | black applied in its own commit; ruff, black and `mypy --disallow-untyped-defs` configured in `pyproject.toml` and gated |
 | `python/hooks`: no `print()` | 6 calls | Replaced with `logging` (stderr); `T201` and the checker enforce it |
 | Development workflow, **step 0: research and reuse** | **Skipped.** The pivot moved into a domain with real prior art without a search | `PRIOR_ART.md`: about 35 listings read; positioning corrected; pyTenable evaluated and declined with reasons |
-| Planning docs (architecture, design, tasks) | Only `PLAN.md` | `docs/architecture.md` added; `PLAN.md` rewritten to match reality |
+| Planning docs (architecture, design, tasks) | Only a build plan | `docs/architecture.md` added; the plan rewritten to match reality (its design content is now `docs/ROADMAP.md`) |
 | Agent rules (`planner`, `architect`, `tdd-guide`, `code-reviewer`, `security-reviewer`) | **Not used.** Planning was done inline; reviews used `python-reviewer` (four times) and `web-fetch` only | `code-reviewer` and `security-reviewer` run on the whole repo; the requirement is written into `CLAUDE.md`. `planner`, `architect` and `tdd-guide` were still not launched in this audit (see Remaining) |
 | Conventional commits; no attribution line | Followed | Unchanged |
 | API response shape (status, data, error, pagination metadata) | MCP carries status and errors in its own `is_error` channel; `findings` lacked `limit` | `findings` now returns `total`, `offset` and `limit` |
@@ -41,7 +41,7 @@ Measured with the project's own tools (ruff, black, mypy, bandit, coverage, `scr
 
 **Code review (whole repository): 0 critical, 0 high, 8 medium, 7 low.**
 
-- Stale or wrong docs (PLAN tools table, scoring table, status): `PLAN.md` rewritten. Dead `Finding` class: removed. Mismatched input limits: one source. Duplicated helpers (worst severity x3, plural x2, invisible-character stripper x2): consolidated. README overstated what was verified: figures from the private full export are now labelled as such.
+- Stale or wrong docs (PLAN tools table, scoring table, status): the plan rewritten. Dead `Finding` class: removed. Mismatched input limits: one source. Duplicated helpers (worst severity x3, plural x2, invisible-character stripper x2): consolidated. README overstated what was verified: figures from the private full export are now labelled as such.
 - Formatting and function size: see the table. Test files named after review events: renamed by topic.
 - Not done: moving shared test helpers out of test modules into one helper module (the cross-test imports remain; low risk, recorded as follow-up).
 

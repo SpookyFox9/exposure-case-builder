@@ -60,7 +60,7 @@ whatever directory the server was started from.
 - Markdown is the supported format for tickets and chat. Fix text, hostnames and advisory URLs come from
   Tenable and are escaped; URLs appear as text, not links. For another system, use the JSON export.
 - CSVs open safely in Excel: anything that looks like a formula is prefixed with an apostrophe.
-- Hostnames and IPs in the competition tenant are masked. Do not research them.
+- Hostnames and IPs in the committed sample are masked. Treat identifiers as opaque and do not research them.
 
 ## 5. Troubleshooting
 

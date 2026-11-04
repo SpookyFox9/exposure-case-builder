@@ -4,8 +4,7 @@ Goal: behave like a stranger who found the repo, to learn whether the README alo
 trustworthy result. Do this **from a fresh clone, following only the README**. Whenever you have to guess, look
 something up, or fix something, write it down in the Findings table at the end: that is a README or product bug.
 
-Gate: do not make the repo public or open the Exchange PR until sections 1 to 7 pass. Target: done by Tue Nov 3
-night (PR due Wed Nov 4, 2:00 PM ET).
+Gate: do not publish a release until sections 1 to 7 pass.
 
 ## 0. Setup (5 min)
 
@@ -69,16 +68,12 @@ Ask in plain words, no tool names, and score each step.
 - [ ] Point `EXPOSURE_CASE_DATA` at it. The triage answer is sensible on 19,437 findings, in about the same time.
 - [ ] Never commit or paste `data/raw`.
 
-## 8. Before going public (after sections 1 to 7 pass)
+## 8. Before a release (after sections 1 to 7 pass)
 
 - [ ] Fix every Findings row marked "blocks a stranger"; rerun `sh scripts/check_all.sh`.
 - [ ] `git log -p | gitleaks stdin` or `gitleaks git .` is clean; no `.claude/rules`, no `data/raw` tracked.
-- [ ] Decide on the three `*.lab.tenablesecurity.com` hostnames in the sample (keep, or mask).
-- [ ] Set the real `contribution_agreement_date` (your acceptance time, UTC) in the listing; confirm `github_url` and `date_added`.
-- [ ] Make the repo public, then verify from a logged-out browser that it loads and the LICENSE shows MIT.
-- [ ] Run `PYTHONUTF8=1 uv run ./validator.py` in the fork on the real listing: 0 issues.
-- [ ] PR title `Add listing: Exposure Case Builder`; description contains the Contribution Agreement acceptance sentence.
-- [ ] Once the PR is open, DM the link to Bee on Discord or email it to SWARM@tenable.com ("that's how we know which PR is your team's submission"). Organizers' key date: "Wed Nov 4, 2 PM: open your PR to the CyberAgents Exchange"; planned submission 12-1 PM ET.
+- [ ] Verify from a logged-out browser that the repository loads and the LICENSE shows MIT.
+- [ ] If the listing in `docs/exchange/` changed, run the CyberAgents Exchange `validator.py` on it before updating the listing.
 
 ## Findings
 

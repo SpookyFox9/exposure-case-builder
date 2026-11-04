@@ -2,7 +2,7 @@
 
 Turns a Tenable Vulnerability Management export into ranked **cases** (what is risky) and **fix packages** (what to do and what it clears), so a security analyst can see the most important work first and hand engineers exactly what they need. A deterministic Python engine does the clustering, scoring and evidence collection; a small stdio MCP server and a Claude Code skill let Claude write the cited narrative; the human analyst makes and records the decision. Every case and package exports as Markdown (tickets), CSV (full host and action lists) and JSON (tools).
 
-Version 0.1.0. MIT licensed. Built for SWARM Global (Nov 2026).
+Version 0.1.0. MIT licensed.
 
 ## Purpose
 
@@ -155,7 +155,7 @@ Every outbound destination, scope and state-changing action:
 
 ## Data sources and licensing
 
-- **Tenable competition tenant:** fake, masked data provided for the SWARM Global competition. A small trimmed sample is committed in `data/sample/` (1,125 findings, 154 hosts, 50 plugins; fake and masked, with plugin output removed because it can contain personal data); full exports are never committed.
+- **Sample data:** a Tenable-provided demonstration tenant (fake, masked data). A small trimmed sample is committed in `data/sample/` (1,125 findings, 154 hosts, 50 plugins; fake and masked, with plugin output removed because it can contain personal data); full exports are never committed.
 - **Code:** MIT, see `LICENSE`.
 - **Dependencies (all pinned, locked with hashes in `uv.lock`):** `mcp==2.3.0` (MIT) is the only runtime dependency, needed to speak the Model Context Protocol over stdio. The engine itself uses only the Python standard library. Six dev-only quality tools are pinned in `pyproject.toml`: `pytest` (MIT), `coverage` (Apache-2.0), `ruff` (MIT), `black` (MIT), `mypy` (MIT) and `bandit` (Apache-2.0).
 

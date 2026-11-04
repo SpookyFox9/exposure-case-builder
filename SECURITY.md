@@ -20,7 +20,7 @@ In scope: the MCP server and engine (`src/exposure_case/`), the fetch script (`s
 Claude Code skill and playbook, and the export files the tool writes.
 
 Out of scope: Tenable's own services and APIs, the MCP Python SDK and Claude Code themselves (report those to
-their maintainers), and the competition tenant's data.
+their maintainers), and the sample data's source tenant.
 
 ## Threat model in brief
 
