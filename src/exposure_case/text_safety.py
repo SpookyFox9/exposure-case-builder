@@ -16,12 +16,19 @@ STRIPPED_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
 _FORMULA_START = ("=", "+", "-", "@")
 _MARKDOWN_ESCAPES = "<>[]"
 # Bare URLs are auto-linked by GitHub-flavoured renderers, so they are shown as code spans instead.
-_URL = re.compile(r"\b(?:(?:https?|ftp)://|www\.)[^\s<>\[\]()`]*")
+_URL = re.compile(
+    r"\b(?:(?:https?|ftp)://|www\.)[^\s<>\[\]()`]*"  # URLs, any letter case
+    r"|(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+",  # e-mail addresses (GitHub links them); anchored, so linear
+    re.IGNORECASE,
+)
 
 
 def strip_invisible(value: object, keep_newline: bool = False) -> str:
     """Text without control, format (bidi / zero-width) or line-separator characters."""
     text = str(value).replace("\t", " ").replace("\r", "")
+    # Fast path: isprintable() is False for every stripped category (and for "\n"), so clean text skips the loop.
+    if text.isprintable() or (keep_newline and text.replace("\n", "").isprintable()):
+        return text
     return "".join(
         ch for ch in text if (keep_newline and ch == "\n") or unicodedata.category(ch) not in STRIPPED_CATEGORIES
     )

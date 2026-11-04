@@ -32,6 +32,10 @@ from typing import Any
 
 BASE_URL = "https://cloud.tenable.com"
 REQUEST_TIMEOUT_S = 120
+MAX_ATTEMPTS = 5  # per request; throttling (429) and temporary unavailability (502/503/504) only
+MAX_RETRY_WAIT_S = 60  # cap on any wait, including a server-sent Retry-After
+RETRY_BASE_WAIT_S = 2
+RETRYABLE = frozenset({429, 502, 503, 504})
 POLL_INTERVAL_S = 5
 MAX_POLLS = 360  # 30 minutes at 5 s
 PLUGIN_PATH = "/workbenches/vulnerabilities?date_range=90"
@@ -102,7 +106,7 @@ _OPEN_WITHOUT_REDIRECTS = urllib.request.build_opener(_NoRedirect).open
 class TenableClient:
     """Holds the API keys privately: no __dict__, and a fixed repr that never shows them."""
 
-    __slots__ = ("_auth", "_opener", "_user_agent")
+    __slots__ = ("_auth", "_opener", "_sleep", "_user_agent")
 
     def __init__(
         self,
@@ -110,9 +114,11 @@ class TenableClient:
         secret_key: str,
         opener: Callable[..., Any] = _OPEN_WITHOUT_REDIRECTS,
         agent: str | None = None,
+        sleep: Callable[[float], None] = time.sleep,
     ):
         self._auth = f"accessKey={access_key};secretKey={secret_key}"
         self._opener = opener
+        self._sleep = sleep
         self._user_agent = agent or user_agent()
 
     def __repr__(self) -> str:
@@ -127,6 +133,19 @@ class TenableClient:
         }
 
     def request(self, method: str, path: str, body: dict | None = None) -> Any:
+        """One API call, retried with backoff on throttling or temporary unavailability (bounded)."""
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            try:
+                return self._request_once(method, path, body)
+            except urllib.error.HTTPError as exc:
+                if attempt == MAX_ATTEMPTS or not _retryable(method, exc.code):
+                    raise FetchError(f"{method} {path} failed: HTTP {exc.code}") from None
+                wait = _retry_wait(exc, attempt)
+                log.info("%s %s: HTTP %s, retrying in %ss", method, path, exc.code, wait)
+                self._sleep(wait)
+        raise FetchError(f"{method} {path} failed after {MAX_ATTEMPTS} attempts")  # unreachable; for type checkers
+
+    def _request_once(self, method: str, path: str, body: dict | None) -> Any:
         data = json.dumps(body).encode("utf-8") if body is not None else None
         req = urllib.request.Request(BASE_URL + path, data=data, headers=self._headers(), method=method)
         try:
@@ -135,16 +154,28 @@ class TenableClient:
             if len(raw) > MAX_RESPONSE_BYTES:
                 raise FetchError(f"{method} {path} response too large (limit {MAX_RESPONSE_BYTES} bytes)")
             return json.loads(raw)
-        except FetchError:
-            raise
-        except urllib.error.HTTPError as exc:
-            raise FetchError(f"{method} {path} failed: HTTP {exc.code}") from None
+        except (FetchError, urllib.error.HTTPError):
+            raise  # HTTPError is handled (and maybe retried) by request()
         except urllib.error.URLError as exc:
             raise FetchError(f"{method} {path} failed: {exc.reason}") from None
         except json.JSONDecodeError:
             raise FetchError(f"{method} {path} returned invalid JSON") from None
         except (OSError, http.client.HTTPException, ValueError, RecursionError) as exc:
             raise FetchError(f"{method} {path} failed: {type(exc).__name__}") from None
+
+
+def _retryable(method: str, code: int) -> bool:
+    """Throttling is always safe to retry; a 5xx on the job-creating POST might have created the job already."""
+    return code == 429 if method == "POST" else code in RETRYABLE
+
+
+def _retry_wait(exc: urllib.error.HTTPError, attempt: int) -> float:
+    """Seconds to wait: the server's Retry-After when it is a sane number of seconds, else exponential; capped."""
+    header = exc.headers.get("Retry-After") if exc.headers is not None else None
+    value = header.strip() if isinstance(header, str) else ""
+    if value.isascii() and value.isdigit() and len(value) <= 6:  # "²" passes isdigit() but not int()
+        return float(min(int(value), MAX_RETRY_WAIT_S))
+    return float(min(RETRY_BASE_WAIT_S**attempt, MAX_RETRY_WAIT_S))
 
 
 def _remove_quietly(path: Path) -> None:
@@ -172,7 +203,10 @@ def _write_json(path: Path, data: Any) -> None:
 
 def _validated_chunk_ids(status: dict) -> list[int]:
     """Chunk IDs come from the server and become URL and file names: positive ints only."""
-    failed = list(status.get("chunks_failed") or []) + list(status.get("chunks_cancelled") or [])
+    lists = [status.get(key) or [] for key in ("chunks_failed", "chunks_cancelled")]
+    if any(not isinstance(value, list) for value in lists):
+        raise FetchError("export status has an invalid failed or cancelled chunk list")
+    failed = lists[0] + lists[1]
     if failed:
         raise FetchError(f"export has failed or cancelled chunks: {failed}")
     chunks = status.get("chunks_available")

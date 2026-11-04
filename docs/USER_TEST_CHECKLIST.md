@@ -24,7 +24,7 @@ night (PR due Wed Nov 4, 2:00 PM ET).
 ## 2. Register and load
 
 - [ ] Run the README's `claude mcp add ...` with absolute paths (Windows paths with spaces: confirm quoting works as written).
-- [ ] `/mcp` shows `exposure-case` connected with 8 tools: `fleet_summary`, `case_queue`, `fix_queue`, `case_file`, `fix_package`, `findings`, `export`, `record_disposition`.
+- [ ] `/mcp` shows `exposure-case` connected with 9 tools: `fleet_summary`, `case_queue`, `fix_queue`, `case_file`, `fix_package`, `findings`, `trend_diff`, `export`, `record_disposition`.
 - [ ] Copy `skills/exposure-case` to `~\.claude\skills\`. Restart Claude Code; the skill is listed.
 - [ ] `export` and `record_disposition` are on **ask**, not allow-listed.
 
@@ -78,7 +78,7 @@ Ask in plain words, no tool names, and score each step.
 - [ ] Make the repo public, then verify from a logged-out browser that it loads and the LICENSE shows MIT.
 - [ ] Run `PYTHONUTF8=1 uv run ./validator.py` in the fork on the real listing: 0 issues.
 - [ ] PR title `Add listing: Exposure Case Builder`; description contains the Contribution Agreement acceptance sentence.
-- [ ] Send the PR link to the Discord community lead or swarm@tenable.com. Deadline Wed Nov 4, 2:00 PM ET.
+- [ ] Once the PR is open, DM the link to Bee on Discord or email it to SWARM@tenable.com ("that's how we know which PR is your team's submission"). Organizers' key date: "Wed Nov 4, 2 PM: open your PR to the CyberAgents Exchange"; planned submission 12-1 PM ET.
 
 ## Findings
 

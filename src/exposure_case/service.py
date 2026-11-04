@@ -161,6 +161,8 @@ class Workspace:
             raise ServiceError(f"data directory not found: {data}")
         try:
             records = load_findings(data)
+            if not records:
+                raise ServiceError("the export contains no findings")
             baseline = load_baseline(Path(baseline_dir), data, records) if baseline_dir else None
             return cls(records, load_plugin_info(data), Path(exports_dir), Path(dispositions_path), baseline)
         except BaselineError as exc:

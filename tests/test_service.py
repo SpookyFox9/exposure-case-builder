@@ -251,3 +251,11 @@ def test_record_disposition_rejects_unknown_items_and_missing_confirm(ws, tmp_pa
 def test_record_disposition_validation_errors_are_service_errors(ws):
     with pytest.raises(ServiceError, match="disposition"):
         ws.record_disposition(first_case(ws), "a", "fired", "n", confirm=True)
+
+
+def test_an_export_with_no_findings_is_a_clear_service_error(tmp_path):
+    # Quality review 2026-11-03: an empty chunk raised a bare ValueError from the as-of calculation.
+    (tmp_path / "data" / "chunks").mkdir(parents=True)
+    (tmp_path / "data" / "chunks" / "chunk_1.json").write_text("[]", encoding="utf-8")
+    with pytest.raises(ServiceError, match="no findings"):
+        Workspace.load(tmp_path / "data", exports_dir=tmp_path / "e", dispositions_path=tmp_path / "d.jsonl")

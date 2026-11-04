@@ -98,3 +98,10 @@ def test_main_returns_1_and_leaks_nothing_on_failure(monkeypatch, capsys, tmp_pa
 def test_main_rejects_non_positive_chunk_assets():
     with pytest.raises(SystemExit):
         ft.main(["--chunk-assets", "0"])
+
+
+@pytest.mark.parametrize("bad", [5, "2", {"a": 1}, True])
+def test_malformed_failed_chunk_lists_are_fetch_errors_not_tracebacks(tmp_path, bad):
+    # Quality review 2026-11-03: {"chunks_failed": 5} raised TypeError past main()'s handler.
+    with pytest.raises(ft.FetchError, match="chunk"):
+        run(tmp_path, {"status": "FINISHED", "chunks_available": [1], "chunks_failed": bad})

@@ -20,6 +20,7 @@ from typing import Any
 
 from .common import SEVERITY_ORDER
 from .schema import Evidence
+from .text_safety import strip_invisible
 
 VALID_STATES = frozenset({"OPEN", "REOPENED", "FIXED"})
 VALID_SEVERITIES = frozenset(SEVERITY_ORDER)
@@ -123,6 +124,7 @@ def _text(value: Any, limit: int = MAX_TEXT_CHARS) -> str:
     """Strings only (other types become empty, never a repr), capped so one record cannot bloat output."""
     if not isinstance(value, str):
         return ""
+    value = strip_invisible(value, keep_newline=True)  # no bidi or zero-width text reaches tools or exports
     return value if len(value) <= limit else value[:limit] + TRUNCATION_MARKER
 
 
@@ -144,6 +146,8 @@ def _required_str(obj: dict, key: str, where: str) -> str:
     value = obj.get(key)
     if not isinstance(value, str) or not value.strip():
         raise IngestError(f"missing required field: {where}.{key}")
+    if strip_invisible(value) != value:  # stripping would break the trace to the source, so refuse instead
+        raise IngestError(f"{where}.{key} contains hidden or control characters")
     return value.strip()
 
 
@@ -167,7 +171,8 @@ def _str_tuple(value: Any) -> tuple[str, ...]:
     """A list of strings; anything else (or non-string items) is dropped."""
     if not isinstance(value, list):
         return ()
-    items = (v.strip()[:MAX_TEXT_CHARS] for v in value if isinstance(v, str) and v.strip())
+    cleaned = (strip_invisible(v).strip() for v in value if isinstance(v, str))
+    items = (v[:MAX_TEXT_CHARS] for v in cleaned if v)
     return tuple(islice(items, MAX_LIST_ITEMS))
 
 
@@ -222,7 +227,7 @@ def _identity_fields(raw: dict, asset: dict, plugin: dict) -> dict[str, Any]:
         "asset_uuid": _required_str(asset, "uuid", "asset"),
         "hostname": _text(asset.get("hostname")),
         "ipv4": _text(asset.get("ipv4")),
-        "operating_system": tuple(o for o in os_list if isinstance(o, str)) if isinstance(os_list, list) else (),
+        "operating_system": _str_tuple(os_list),
         "device_type": _text(asset.get("device_type")),
         "port": _opt_int(port.get("port")),
         "protocol": _text(port.get("protocol")),
