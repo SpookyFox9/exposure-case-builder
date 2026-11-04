@@ -151,3 +151,9 @@ def test_skill_explains_the_data_quality_figures():
 def test_skill_does_not_guess_whether_a_baseline_is_configured():
     # Rehearsal 2026-11-03: triage said "no earlier pull configured" without calling trend_diff; one was.
     assert "without calling `trend_diff`" in _skill_text()
+
+
+def test_skill_names_the_supersession_and_age_slips():
+    # Guardrail rehearsal 2026-11-03: "all fixed by the same upgrade" and "all 5 open for 162 days" (the oldest).
+    text = _skill_text()
+    assert "never say one upgrade fixes the others" in text and "the oldest finding" in text

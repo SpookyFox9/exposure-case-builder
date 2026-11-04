@@ -136,7 +136,7 @@ def _register_read_tools(mcp: MCPServer, workspace: Workspace) -> None:
     @mcp.tool(annotations=READ_ONLY)
     @_guard
     def findings(item_id: str, limit: int = 25, offset: int = 0) -> dict[str, Any]:
-        """The real finding records behind a case or fix package (sorted by finding id, paged). Cite these ids."""
+        """Finding records behind a case or fix package (by finding id, paged; packages add scope_note). Cite ids."""
         return workspace.findings(item_id, limit, offset)
 
 

@@ -401,9 +401,11 @@ class Workspace:
     def findings(self, item_id: str, limit: int = 25, offset: int = 0) -> dict[str, Any]:
         """The real finding records behind a case or package, so a narrative can cite genuine ids."""
         limit, offset = _int(limit, "limit", 1, MAX_PAGE), _int(offset, "offset", 0, MAX_OFFSET)
-        _, item = self._item(item_id)
+        kind, item = self._item(item_id)
         members = sorted(item.active, key=lambda r: r.finding_id)
+        scope = {"scope_note": SCOPE_NOTE} if kind == "fix_package" else {}
         return {
+            **scope,
             "item_id": item_id,
             "total": len(members),
             "offset": offset,

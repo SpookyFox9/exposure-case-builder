@@ -65,3 +65,12 @@ def test_json_export_stays_complete(ws, monkeypatch, tmp_path):
     path = tmp_path / "e" / name
     package = json.loads(path.read_text(encoding="utf-8"))["package"]
     assert len(package["cves"]) == 29 and len(package["advisories"]) == 14
+
+
+def test_findings_for_a_package_carry_the_no_supersession_note(ws):
+    # Guardrail rehearsal 2026-11-03: paging findings for the OpenSSH package, Claude said "all of them are fixed by
+    # the same OpenSSH upgrade". fix_package carries the scope note; findings did not.
+    from exposure_case.case import SCOPE_NOTE
+
+    assert ws.findings(OPENSSH)["scope_note"] == SCOPE_NOTE
+    assert "scope_note" not in ws.findings(SHELLSHOCK)
