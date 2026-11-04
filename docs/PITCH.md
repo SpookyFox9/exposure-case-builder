@@ -10,7 +10,7 @@ This is an outline to follow, not a script. `docs/DEMO.md` is the longer 15-minu
 
 1. In `C:/Users/maupi/Documents/GitHub/exposure-case-builder-demo`, run `git pull` (docs only since `1637819`). The installed skill in `~/.claude/skills/exposure-case` is current; re-copy only if `skills/` changed.
 2. Move every earlier disposition log aside: `~/.exposure-case/dispositions.jsonl` must not exist, so the decision step starts at zero.
-3. Start `claude` in the demo clone, check that `/mcp` shows `exposure-case` connected, and keep `export` and `record_disposition` on "ask".
+3. Check that the demo clone has `.claude/settings.local.json`, with the seven read tools under `allow` and `export` and `record_disposition` under `ask`. Without it, every read tool prompts, and the deny test on 2026-11-04 showed this stalls the demo. Move the `2026-11-03-*.txt` rehearsal transcripts out of the clone root: one has a guardrail-test title naming an "admin", and Claude offers these files when tools fail. Start `claude` there, then check `/mcp` (connected) and `/permissions`.
 4. Prepare the screen: a large terminal font (readable on a shared Zoom screen), notifications off (Windows Focus, Discord, mail), and only the terminal and one browser window open. No vault, `.secrets` or e-mail on screen.
 5. Open the fallbacks in browser tabs: the README's "What you get" section on GitHub, and the saved rehearsal transcript. Have `uv run pytest tests/test_server.py` typed and ready in a second terminal.
 6. Join Zoom early. Test the microphone, camera, and **sharing the terminal window** (not the whole desktop).
@@ -40,7 +40,7 @@ Ask for one beat at a time. While Claude works, talk over it.
   - 10 distinct Tenable actions, each with what *it alone* clears.
   - The tool does not claim one update replaces another, because Tenable's data doesn't say so.
   - Show the ticket body: an engineer can act on it without a Tenable login.
-- **d. "Record: accepted for patching, note …"** (`record_disposition`, about 30 s)
+- **d. "Record the Shellshock case as assigned, analyst Colter, note: patch window Friday."** (`record_disposition`, about 30 s). Give the exact value (`assigned`) and an analyst name, or Claude stops to ask: "accepted" is ambiguous between `assigned` and `risk-accepted`.
   - The approval prompt appears. Approve it and show it's one appended local line.
   - Point: the human makes the decision, and nothing outside the machine changed.
 
