@@ -14,6 +14,7 @@ INTEGRATION_MODULES = frozenset(
         "test_service.py",
         "test_skill.py",
         "test_listing.py",
+        "test_readme_example.py",
         "test_service_resilience.py",
         "test_security_hardening.py",
         "test_fetch_security.py",
