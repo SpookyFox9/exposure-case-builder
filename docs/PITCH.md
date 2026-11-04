@@ -9,7 +9,7 @@ This is an outline to follow, not a script. `docs/DEMO.md` is the longer 15-minu
 ## Morning checklist (before 12:30 PM ET)
 
 1. In `C:/Users/maupi/Documents/GitHub/exposure-case-builder-demo`, run `git pull` (docs only since `1637819`). The installed skill in `~/.claude/skills/exposure-case` is current; re-copy only if `skills/` changed.
-2. Move every earlier disposition log aside: `~/.exposure-case/dispositions.jsonl` must not exist, so the decision step starts at zero.
+2. Move every earlier disposition log aside: `~/.exposure-case/dispositions.jsonl` must not exist, so the decision step starts at zero. On the evening of Nov 4 it held a `CM-demo` "deny-test" entry for Shellshock, and Claude reads earlier entries back on stage. Also move `deny-test.txt` and any other transcripts out of the demo clone root.
 3. Check that the demo clone has `.claude/settings.local.json`, with the seven read tools under `allow` and `export` and `record_disposition` under `ask`. Without it, every read tool prompts, and the deny test on 2026-11-04 showed this stalls the demo. Move the `2026-11-03-*.txt` rehearsal transcripts out of the clone root: one has a guardrail-test title naming an "admin", and Claude offers these files when tools fail. Start `claude` there, then check `/mcp` (connected) and `/permissions`.
 4. Prepare the screen: a large terminal font (readable on a shared Zoom screen), notifications off (Windows Focus, Discord, mail), and only the terminal and one browser window open. No vault, `.secrets` or e-mail on screen.
 5. Open the fallbacks in browser tabs: the README's "What you get" section on GitHub, and the saved rehearsal transcript. Have `uv run pytest tests/test_server.py` typed and ready in a second terminal.
@@ -40,16 +40,18 @@ Ask for one beat at a time. While Claude works, talk over it.
   - 10 distinct Tenable actions, each with what *it alone* clears.
   - The tool does not claim one update replaces another, because Tenable's data doesn't say so.
   - Show the ticket body: an engineer can act on it without a Tenable login.
+  - `export` is on "ask", so **even the preview (write=false) prompts. Approve it.** Only approve a save to disk if you want to show the files.
 - **d. "Record the Shellshock case as assigned, analyst Colter, note: patch window Friday."** (`record_disposition`, about 30 s). Give the exact value (`assigned`) and an analyst name, or Claude stops to ask: "accepted" is ambiguous between `assigned` and `risk-accepted`.
   - The approval prompt appears. Approve it and show it's one appended local line.
   - Point: the human makes the decision, and nothing outside the machine changed.
 
 ### 4. Why this, not the others (about 1 min) [innovation]
-- Use the one-line difference from the competitor research (fill in after it arrives). The default line: *Vuln Prioritizer ranks findings and sets deadlines; this groups them into cases and fix packages and hands each package to the engineer who applies it.*
-- Admit what the others have (SLAs, asset context, exploit feeds, act-and-verify).
+- Most neighbours rank **findings**: Vuln Prioritizer gives SLA tiers, RiskProof gives P1-P4, and ThreatWeave gives asset queues. Chokepoint Finder ranks **changes** for the most risk retired. This tool does both jobs side by side: a threats queue that breadth can't outrank, and fix packages that list each Tenable action with what it alone clears, without assuming one update replaces another.
+- One line, if you only have time for one: *"Others tell you which findings matter most, or the fewest changes that retire the most risk. This keeps the exploited single vulnerability in its own queue and gives the engineer a package per product that lists every Tenable action with what it alone clears."*
+- Admit what they have: SLAs and CMDB context (Vuln Prioritizer), live validation and an audit trail (RiskProof), optimisation with a stated bound, approvals and verification (Chokepoint), and Tenable One context plus vetted status (RPIA).
 
 ### 5. Trust and close (about 30 s) [technical]
-- Read-only. Tenable text is treated as untrusted data. Writes need approval. The engine never touches the network.
+- The server is read-only and makes no network calls. The optional fetch script creates one export job on Tenable. Tool results go to whichever Claude endpoint you've configured. Tenable text is treated as untrusted data. Writes need your approval.
 - 758 tests and CI are green, and a full-history secret scan is clean. Listed on the Exchange as PR #227.
 - Close with one sentence about the impact: what to fix first, and a handoff the engineer can use.
 
@@ -63,4 +65,8 @@ Ask for one beat at a time. While Claude works, talk over it.
 - **Are finding ids stable between pulls?** See DEMO.md, then show `trend_diff` if they ask about change over time. Say first that the baseline is synthetic.
 - **"Which hosts first?"**: `fix_queue(order="coverage")`. It's a heuristic, not the shortest plan.
 - **"How is this different from Tenable's Solutions view or Exposure Response?"**: this needs only a saved VM export, doesn't need Tenable One, and the handoff needs no login. Don't claim Tenable lacks fix grouping.
+- **"Chokepoint Finder already ranks fixes. Isn't this a weaker version?"** (It placed first at Black Hat SWARM, per a research report; not checked here.) It solves a different first problem. Chokepoint picks the fewest changes that retire the most weighted risk, then gates, approves and verifies them, and it is stronger at that. This tool first makes sure breadth can't outrank an exploited single vulnerability, then hands each fix to the engineer. The coverage order here is a labelled heuristic, not an optimiser. The two could be chained.
+- **"Tenable SC's top patch already knows which patch supersedes which."** Right. Where you have SC, use it. The VM export this reads doesn't say one update replaces another, and a wrong "one patch covers it" leaves hosts exposed, so the tool lists each action instead of guessing.
+- **"What are the score components?"** Severity 30, exploit 25, breadth 15, volume 10, and 5 each for age, unsupported, recurrence and patch available (`scoring.py`, `WEIGHTS`). It orders work; it doesn't measure risk.
+- **"Is the decision log an audit trail?"** No. It's a local, append-only worklog, and the analyst name is free text.
 - **"What's next?"**: per-case trend deltas, a decision-table tier, and per-action plugin ids.
