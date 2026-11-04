@@ -145,3 +145,8 @@ def test_skill_shows_exports_and_explains_source_records():
 def test_skill_explains_the_data_quality_figures():
     text = _skill_text()
     assert "data_quality" in text and "plugins, not findings" in text
+
+
+def test_skill_does_not_guess_whether_a_baseline_is_configured():
+    # Rehearsal 2026-11-03: triage said "no earlier pull configured" without calling trend_diff; one was.
+    assert "without calling `trend_diff`" in _skill_text()

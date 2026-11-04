@@ -5,8 +5,9 @@ trend categories have examples (not ``not_seen_not_rescanned``, because no host 
 
 - records first seen in the last 14 days are dropped (new since the baseline);
 - a share of older records are dropped (newly visible);
-- some FIXED findings are put back to OPEN (fixed recorded);
-- some REOPENED findings are put back to FIXED (reopened);
+- some FIXED findings are put back to OPEN (fixed recorded), only if Tenable's fix date is after the baseline;
+- some REOPENED findings are put back to FIXED (reopened), only if Tenable fixed them on or before the baseline
+  and saw them again after it; a finding without those dates never changes state;
 - some critical findings are lowered one level (severity raised) and some high ones raised one level (severity
   lowered);
 - some extra findings that exist only in the baseline are added on hosts that are still scanned (not seen,
@@ -68,16 +69,35 @@ def _scan_id(original: str) -> str:
     return SYNTHETIC_SCAN_PREFIX + str(uuid.uuid5(NAMESPACE, f"scan:{original}"))
 
 
-def _older(raw: dict[str, Any], bucket: int) -> dict[str, Any]:
+def _after(raw: dict[str, Any], field: str, cutoff: datetime) -> bool | None:
+    """Whether Tenable's own date for an event is after the baseline; None when Tenable gives no date."""
+    value = raw.get(field)
+    return _parse(value) > cutoff if value else None
+
+
+def _baseline_state(raw: dict[str, Any], cutoff: datetime) -> str | None:
+    """An earlier state only where Tenable's own dates support it; None means keep the current state.
+
+    FIXED now was OPEN then if Tenable fixed it after the baseline. REOPENED now was FIXED then if Tenable fixed it
+    on or before the baseline and saw it again after. A missing date never produces a change.
+    """
+    if raw.get("state") == "FIXED" and _after(raw, "last_fixed", cutoff) is True:
+        return "OPEN"
+    fixed_before = _after(raw, "last_fixed", cutoff) is False
+    if raw.get("state") == "REOPENED" and fixed_before and _after(raw, "resurfaced_date", cutoff) is True:
+        return "FIXED"
+    return None
+
+
+def _older(raw: dict[str, Any], bucket: int, cutoff: datetime) -> dict[str, Any]:
     """The same finding as it looked 14 days earlier."""
     out = copy.deepcopy(raw)  # the source record is never touched
     out.pop("output", None)  # plugin output is never copied into a synthetic baseline
     first = _parse(raw["first_found"])
     out["last_found"] = _format(max(first, _parse(raw["last_found"]) - SHIFT))
-    if raw.get("state") == "FIXED" and bucket % 2 == 0:
-        out["state"] = "OPEN"
-    elif raw.get("state") == "REOPENED" and bucket % 2 == 0:
-        out["state"] = "FIXED"
+    earlier = _baseline_state(raw, cutoff) if bucket % 2 == 0 else None
+    if earlier:
+        out["state"] = earlier
     if bucket == LOWER_BUCKET and raw.get("severity") == "critical":
         out["severity"] = "high"  # now critical: severity raised
     elif bucket == RAISE_BUCKET and raw.get("severity") == "high":
@@ -109,7 +129,7 @@ def build_records(raws: list[dict[str, Any]]) -> list[dict[str, Any]]:
         bucket = _bucket(raw["finding_id"])
         if _parse(raw["first_found"]) > cutoff or bucket == DROP_BUCKET:
             continue
-        older = _older(raw, bucket)
+        older = _older(raw, bucket, cutoff)
         out.append(older)
         if bucket == EXTRA_BUCKET:
             out.append(_extra(raw, older, bucket))

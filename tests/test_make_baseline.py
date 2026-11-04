@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -114,3 +115,39 @@ def test_a_malformed_source_record_fails_cleanly_and_leaves_no_output(tmp_path):
     (src / "chunks" / "chunk_1.json").write_text(json.dumps([{"finding_id": "x"}]), encoding="utf-8")
     assert script.main([str(src), str(tmp_path / "out")]) == 1
     assert not (tmp_path / "out").exists()
+
+
+def test_state_changes_never_contradict_tenables_own_dates(baseline_dir):
+    # Rehearsal 2026-11-03: findings Tenable dates as reopened on 2026-08-24 were marked FIXED in a baseline dated
+    # 2026-10-19. A state may only differ from the current one when Tenable's own dates put the event after the
+    # baseline, and a baseline FIXED needs Tenable's fix date on or before it.
+    source = load_findings(SAMPLE)
+    current = {r.finding_id: r for r in source}
+    cutoff = max(r.last_found for r in source) - timedelta(days=14)
+    flips = 0
+    for old in load_findings(baseline_dir):
+        now = current.get(old.finding_id)
+        if now is None or now.state == old.state:
+            continue
+        flips += 1
+        if now.state == "REOPENED":
+            assert old.state == "FIXED" and now.resurfaced and now.resurfaced > cutoff, old.finding_id
+            assert now.last_fixed and now.last_fixed <= cutoff, old.finding_id
+        elif now.state == "FIXED":
+            assert now.last_fixed and now.last_fixed > cutoff, old.finding_id
+    assert flips, "the generator should still create some state changes"
+
+
+def test_missing_tenable_dates_mean_no_state_change():
+    cutoff = datetime(2026, 10, 19)
+    raw = {
+        "finding_id": "x",
+        "state": "REOPENED",
+        "first_found": "2026-01-01T00:00:00.000Z",
+        "last_found": "2026-11-01T00:00:00.000Z",
+        "severity": "low",
+        "scan": {},
+    }
+    assert script._older(raw, 0, cutoff)["state"] == "REOPENED"
+    fixed = {**raw, "state": "FIXED"}
+    assert script._older(fixed, 0, cutoff)["state"] == "FIXED"

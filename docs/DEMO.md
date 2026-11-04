@@ -44,7 +44,7 @@ Step 1 is the OpenSSH patch package: it brings 8 of the 67 hosts with an urgent 
 
 ## 5. What changed since last time (2 min) - `trend_diff`
 
-State first that this baseline is **synthetic** (the answer says so too). Show the counts: new since baseline 13, newly visible 51, fixed as recorded 20, reopened 46, not seen (host rescanned) 62, severity raised 2 and lowered 6, with host overlap (145 of 154) beside them. Then the rule: a finding missing from the later export is never reported as fixed, because Tenable recorded no fix. Say that finding-id stability across real pulls is undocumented and untested here, and that `id_reuse` and `possible_rekeys` are the counters that would show it. Then ask "Which findings were reopened since the last pull?": the same tool pages through the actual finding ids by category.
+State first that this baseline is **synthetic** (the answer says so too). Show the counts: new since baseline 13, newly visible 51, fixed as recorded 9, reopened 17, not seen (host rescanned) 62, severity raised 2 and lowered 6, with host overlap (145 of 154) beside them. Then the rule: a finding missing from the later export is never reported as fixed, because Tenable recorded no fix. Say that finding-id stability across real pulls is undocumented and untested here, and that `id_reuse` and `possible_rekeys` are the counters that would show it. Then ask "Which findings were reopened since the last pull?": the same tool pages through the actual finding ids by category.
 
 ## 6. The decision (1 min) - `record_disposition`
 
