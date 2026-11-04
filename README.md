@@ -11,11 +11,43 @@ An analyst should not have to combine dozens of per-asset reports to learn which
 - **For the security team:** what is risky, and why does it rank where it does?
 - **For engineers:** what do I do, what does it clear, and on which hosts?
 
-Output is evidence and facts, not verdicts, and nothing in it recommends action against a person. Every number traces to source finding IDs. Scoring is a fixed weighted sum with the component breakdown shown for every case; there is no machine learning. The score is a transparent ordering heuristic, not a measure of risk.
+Output is evidence and facts, not verdicts, and nothing in it recommends action against a person. Every number traces to source finding IDs. Scoring is a fixed weighted sum with the component breakdown shown for every case; there is no machine learning. The score is a transparent ordering heuristic, not a measure of risk. The design is in `docs/architecture.md`.
 
-## Related work
+## What you get
 
-Tenable's Exchange already has tools in this space, and this project does not claim to be the first. **Patch Shepherd** clusters findings into remediation campaigns by shared solution text; the vetted **Remediation Priority & Impact Agent** produces a ranked fix list with tickets; the **Chokepoint Finder** family searches for the shortest ordered set of fixes. What is different here: two linked views of the same findings (risk *cases* and fix *packages* keyed by CPE product and kind of fix, each finding in exactly one of each), a queue that keeps single-vulnerability *threats* separate from patch-family *backlogs*, a deterministic standard-library engine behind a gated MCP server, and a local append-only decision log. Tenable's own product also covers part of this, and the project does not claim otherwise. Its **Solutions view** lists recommended fixes with affected assets, CVE counts and VPR, **Exposure Response** initiatives group findings by saved query and asset tag and can open Jira or ServiceNow tickets, and **Hexa AI** has an MCP server; those need a Tenable One (or Lumin) licence. This project works from a plain saved Vulnerability Management export with no Lumin or Tenable One dependency, lists each distinct Tenable fix action with what *it alone* clears, shows a documented score with its breakdown, produces a handoff an engineer can use without a Tenable login, and never changes any Tenable system. That comparison comes from Tenable's documentation as read on 2026-11-03, not from a live tenant. Details are in `docs/PRIOR_ART.md`; the design is in `docs/architecture.md`.
+On the committed sample (154 hosts, 1,125 findings of fake, masked tenant data), one load produces:
+
+| | |
+|---|---|
+| Active findings | 1,087 (32 critical, 125 high; 24 on the CISA KEV list) |
+| Cases | 43: 42 single-vulnerability threats and 1 patch-family backlog |
+| Fix packages | 33: 6 patches and 27 configuration changes |
+| Top fix package | OpenSSH (patch): 10 Tenable actions, 194 findings, 21 hosts, score 74.8 |
+
+The start of that package's Markdown handoff, exactly as `export` returns it (the action table continues with six more rows, then the impact, affected hosts, references, the cases it relieves and the source records):
+
+```markdown
+# Fix: openbsd:openssh (patch)
+
+Package `fix:openbsd-openssh:patch` · priority #1 (score 74.8/100) · data as of 2026-11-02
+
+**Why it ranks here:** exploited by malware (25 of 25 points for exploit); worst active severity: high (22 of 30 points for severity); 21 of 154 hosts affected (9 of 15 points for breadth).
+
+**Coverage order:** step 1. Applying every listed action here and in each earlier step brings 8 more hosts to zero urgent findings, 8 of 67 in all. Urgent means critical, on the CISA KEV list, exploited by malware or with a public exploit. This is a heuristic order, not the shortest plan, and it counts only what is in this export.
+
+## What to do
+
+Fix text is Tenable-provided. Tenable's data does not state that one update supersedes another, so each action is listed separately, and the totals are contained in the package, not cleared by a single action.
+
+| Action (Tenable solution) | Vulnerabilities | Hosts | Worst severity | Fleet criticals this action alone clears |
+| --- | ---: | ---: | --- | ---: |
+| Upgrade to OpenSSH version 10.4 or later. | 1 | 21 | high | – |
+| Upgrade to OpenSSH version 10.5 or later. | 1 | 21 | medium | – |
+| Upgrade to OpenSSH version 10.6 or later. | 1 | 21 | high | – |
+| Upgrade to OpenSSH version 10.3 or later. | 1 | 20 | high | – |
+```
+
+Each row says what that action alone affects. The package's totals are what it contains across all ten, and the tool never claims one upgrade covers the others. The same package exports as CSV (every host and every action) and JSON for tools.
 
 ## Prerequisites
 
@@ -85,20 +117,14 @@ Dispositions (`assigned`, `risk-accepted`, `false-positive`, `needs-info`) are o
 
 ## Known limitations
 
-- **EPSS is shown, not scored.** Each vulnerability in a case file carries Tenable's EPSS score (`epss_score`, which Tenable reports as a percentage, 0-100) beside KEV and VPR as a separate signal. It is deliberately not part of the weighted sum: FIRST says EPSS "is not a complete risk score" and should not be multiplied into a combined risk number, and VPR (in the exploit component) already draws on exploit prediction.
-- **The ranking is a judgment, not a validated model.** The weights (severity 30, exploit 25, breadth 15, volume 10, age 5, unsupported 5, recurrence 5, patch 5) are documented and adjustable in `scoring.py`, but nothing here tests them against real outcomes. CISA KEV is common in this tenant (793 of 10,283 active findings *(private export)*), so large patch families score high on the exploit component; the two-list queue exists for that reason.
-- **Fix grouping is heuristic.** A package is a product (the first CPE's vendor and product) plus a fix type read from the opening verb of Tenable's solution text. Tenable's solution text is often generic ("Update the affected packages."), a few plugins have no CPE (they become their own package), and some products list dozens of separate actions that a human can see are cumulative (for example "Upgrade to OpenSSH 10.3 or later" through "10.6 or later"). The tool lists them as given rather than guessing at supersession.
-- **The coverage order is a heuristic, and its steps are not equal effort.** `fix_queue(order="coverage")` puts first the package that brings the most hosts to zero urgent findings (critical, CISA KEV, exploited by malware or a public exploit), given the packages already placed. A step means applying every listed action in that package, and a package can hold many: on the competition tenant *(private export)* the first step is 93 distinct updates for 8 hosts, and 18 of 117 steps reach half of the 115 hosts that have an urgent finding. Hosts cleared is not an effort estimate, "cleared" means no urgent finding in the export (not that a host is secure), and the order is not the shortest plan.
-- **The trend diff is unproven across real pulls.** `trend_diff` matches findings by Tenable's finding id plus asset, plugin, port and protocol. Whether those ids stay the same between two real pulls is not documented and has not been tested here (the sample comparison uses a synthetic earlier pull). A finding missing from the later export is reported as not seen, never as fixed.
-- **Near-duplicate cases remain.** Plugins for the same product on the same hosts (for example several Oracle Java CPU releases) are separate cases. The fix view rolls them up; the case view does not.
-- **The timeline is thin.** The export has first-found and last-found dates for every finding, but Tenable's own fixed and reopened dates for only a small minority.
-- **Counts agree with Tenable, with a known gap.** On the competition tenant 4,636 of 4,677 comparable plugins (99.1%) *(private export)* match Tenable's own plugin counts (as distinct hosts or finding instances). The other 41 all have the export below Tenable's number; the cause is unverified.
-- **Findings of severity info are not part of any case.**
-- **No owner or team field.** The tenant has no tags and two groups, so a case cannot say who owns a host; host tables show host, IP, OS and counts.
-- **Scope.** Tenable Vulnerability Management (cloud.tenable.com) only; Tenable Security Center and Nessus are not supported. Tested on one tenant *(private export)* (160 hosts, 19,437 findings: about 108 MB fetched in 30 seconds, loaded in under a second, 815 cases and 200 packages built in about one second). Larger tenants are untested; each export chunk is limited to 128 MB and a whole export to 1 GB.
-- **Python and platforms.** The full suite passes on Python 3.10 and 3.14, and CI runs 3.10 and 3.12 on Linux. It was developed on Windows 11 (one symlink test is skipped there); macOS is untested. Figures marked *(private export)* were measured on the competition tenant's full export (160 hosts, 19,437 findings, about 108 MB), which is not committed and so cannot be reproduced from this repository; the committed sample (`data/sample`) is a trimmed subset of it.
-- **Narratives are Claude's.** The engine is deterministic; the cited narrative that Claude writes from it is not, and it is only as good as the skill and the analyst's review.
-- Hostnames and IPs in the competition data are masked and are treated as opaque identifiers.
+These are the limitations that matter most when using the tool. The full list, with the figures behind each, is in `docs/LIMITATIONS.md`.
+
+- **The ranking is a judgment, not a validated model.** The weights are documented and adjustable in `scoring.py`, but nothing tests them against real outcomes. The score orders the work; it does not measure risk.
+- **Fix grouping is heuristic.** A package is a product (the first CPE) plus a fix type read from Tenable's solution text. When a product has a run of updates that a human can see are cumulative (for example "Upgrade to OpenSSH 10.3 or later" through "10.6 or later"), each is listed as given; the tool never claims that one replaces another.
+- **The coverage order is a heuristic.** One step can hold many updates, "cleared" means no urgent finding left in the export (not that a host is secure), and the order is not the shortest plan.
+- **The trend diff is unproven across real pulls.** Whether Tenable's finding ids stay the same between pulls is undocumented and untested here. A finding missing from the later export is reported as not seen, never as fixed.
+- **Narratives are Claude's.** The engine is deterministic; the narrative Claude writes from it is not, and it needs the analyst's review.
+- **Scope.** Tenable Vulnerability Management (cloud.tenable.com) only; tested on one tenant (160 hosts, 19,437 findings). EPSS is shown beside each vulnerability but not scored, and findings of severity info are not part of any case.
 
 ## Security notes
 
@@ -142,3 +168,7 @@ sh scripts/check_all.sh               # ruff, black, mypy, bandit, the standards
 ```
 
 The same script runs in CI. `scripts/check_standards.py` enforces file size, function length, nesting depth, frozen dataclasses and no `print()`. Tests are marked `unit`, `integration` or `e2e` (`uv run pytest -m e2e`). Working conventions (test first, reviews, commit style) are in `CLAUDE.md`; the rules audit is in `docs/ENGINEERING_AUDIT.md`.
+
+## Background and related work
+
+Other tools cover parts of this ground. On the CyberAgents Exchange: Patch Shepherd, the Remediation Priority & Impact Agent and the Chokepoint Finder family. In Tenable's own product: the Solutions view, Exposure Response and Hexa AI, which need Tenable One or Lumin licensing. This project needs only a saved Vulnerability Management export. The comparison, drawn from each tool's documentation as read on 2026-11-03, and the library decisions are in `docs/PRIOR_ART.md`.

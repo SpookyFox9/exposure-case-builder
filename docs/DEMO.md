@@ -22,9 +22,11 @@ mv ~/.exposure-case/dispositions.jsonl ~/.exposure-case/dispositions.before-demo
 
 Start a new Claude Code session afterwards (tools and skills load at startup), and rehearse on the model you will pitch with: wording varies between models. Keep `export` and `record_disposition` on "ask" in the client's tool permissions. If a real second pull exists by then (`scripts/fetch_tenable.py` again), use it as the baseline instead and drop the synthetic caveat.
 
-## 0. Open honestly (1 min)
+## 0. Open with the outcome, then position it honestly (1 min)
 
-Say first what Tenable already has, then the difference. Per Tenable's documentation (read 2026-11-03, not tested on a live tenant): the **Solutions view** lists recommended fixes with affected assets, CVE counts and VPR; **Exposure Response** groups findings by saved query and asset tag and can open Jira or ServiceNow tickets; **Hexa AI** has an MCP server. Those need a Tenable One (or Lumin) licence. This project works from a plain saved Vulnerability Management export and does four things differently: it lists each distinct fix action with what *it alone* clears, it shows a documented score with its breakdown, it hands an engineer a file that needs no Tenable login, and it never changes anything in Tenable.
+Lead with the result on the sample: 1,087 active findings become 43 cases and 33 fix packages, and the top package hands an engineer 10 named OpenSSH upgrades for 21 hosts, each with what it alone affects. Black Hat SWARM judges "scored impact above everything else" (Tenable's recap), so the number comes first.
+
+Then position it. Per Tenable's documentation (read 2026-11-03, not tested on a live tenant), the **Solutions view**, **Exposure Response** and **Hexa AI** cover related ground on Tenable One or Lumin licensing; this project needs only a saved Vulnerability Management export, never changes Tenable, and its handoff needs no Tenable login. The judges may also have seen **Vuln Prioritizer** (PR #225, same tenant): it ranks each finding and assigns an SLA tier from CVSS, VPR, EPSS, KEV and CMDB context. Say the difference in one line: *it ranks findings and sets deadlines; this groups findings into cases and fix packages and hands each package to the engineer who applies it.* Concede what it has and this does not: SLAs, asset context, external exploit feeds.
 
 ## 1. The size of the problem (1 min) - `fleet_summary`
 
@@ -49,6 +51,11 @@ State first that this baseline is **synthetic** (the answer says so too). Show t
 ## 6. The decision (1 min) - `record_disposition`
 
 Tell Claude a decision and a note; it reads the entry back and records it only after you confirm. One appended line in a local log; nothing else changes.
+
+## Likely questions
+
+- **"Why a weighted sum? SSVC and BOD 26-04 use decision tables."** True, and neither endorses a weighted sum. The score here only orders work and shows its breakdown; it is not a risk measure. The two-list queue does the gate-like part (an exploited single vulnerability is never buried under a patch backlog), and EPSS is shown but not multiplied in, per FIRST's guidance. A decision-table tier is a reasonable next step.
+- **"Are Tenable's finding ids stable between pulls?"** Tenable documents `finding_id` as the finding's unique identifier but never states it is stable; its own integration guide names asset, plugin, port and protocol as the unique key. `trend_diff` requires both to agree, and its `id_reuse` and `possible_rekeys` counters show any disagreement. A new asset UUID (a rebuilt or re-created host) would mean new findings.
 
 ## Do not claim
 

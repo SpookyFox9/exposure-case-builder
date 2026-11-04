@@ -77,7 +77,7 @@ So the same findings are presented as two linked views: **cases** (risk) and **f
 
 ## Known limits
 
-Weights are a judgment, not validated; fix grouping is heuristic (first CPE, solution verb) and does not infer that one update supersedes another; near-duplicate plugin cases remain in the case view; the timeline has real fixed/reopened dates for only a minority of findings; tested on one tenant (160 hosts) on Windows 11. The README lists them for users.
+Weights are a judgment, not validated; fix grouping is heuristic (first CPE, solution verb) and does not infer that one update supersedes another; near-duplicate plugin cases remain in the case view; the timeline has real fixed/reopened dates for only a minority of findings; tested on one tenant (160 hosts) on Windows 11. The README lists the main ones for users; `LIMITATIONS.md` has the full list.
 
 ## Extending
 
