@@ -30,9 +30,9 @@ Case `plugin:1` · plugin · rank #1 (score 70.5/100) · data as of 2026-11-02
 
 ## Top vulnerabilities
 
-| Vulnerability | CVEs | Severity | Hosts | KEV | VPR | Tenable fix text |
-| --- | --- | --- | ---: | --- | --- | --- |
-| Plugin 1 | CVE-2023-1 | critical | 2 |  |  | Upgrade to widget 2.0 or later. |
+| Vulnerability | CVEs | Severity | Hosts | KEV | VPR | EPSS % | Tenable fix text |
+| --- | --- | --- | ---: | --- | --- | --- | --- |
+| Plugin 1 | CVE-2023-1 | critical | 2 |  |  |  | Upgrade to widget 2.0 or later. |
 
 ## Affected hosts
 

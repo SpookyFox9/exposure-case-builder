@@ -53,6 +53,7 @@ class VulnLine:
     exploit_available: bool
     fix_type: str
     solution: str
+    epss_score: float | None = None  # Tenable's EPSS, a percentage; shown beside KEV and VPR, never scored
 
     def to_dict(self) -> dict:
         return {
@@ -64,6 +65,7 @@ class VulnLine:
             "cves": list(self.cves),
             "on_cisa_kev": self.on_cisa_kev,
             "vpr_score": self.vpr_score,
+            "epss_score": self.epss_score,
             "exploit_available": self.exploit_available,
             "fix_type": self.fix_type,
             "solution": self.solution,
@@ -79,6 +81,7 @@ def vulnerability_lines(members: list[FindingRecord]) -> tuple[VulnLine, ...]:
     for plugin_id, rs in by_plugin.items():
         rep = min(rs, key=lambda r: r.finding_id)
         vprs = [r.vpr_score for r in rs if r.vpr_score is not None]
+        epss = [r.epss_score for r in rs if r.epss_score is not None]
         lines.append(
             VulnLine(
                 plugin_id=plugin_id,
@@ -92,6 +95,7 @@ def vulnerability_lines(members: list[FindingRecord]) -> tuple[VulnLine, ...]:
                 exploit_available=any(r.exploit_available for r in rs),
                 fix_type=classify_fix(rep.solution),
                 solution=" ".join(rep.solution.split()),
+                epss_score=max(epss) if epss else None,
             )
         )
     return tuple(

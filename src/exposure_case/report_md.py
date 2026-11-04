@@ -252,7 +252,7 @@ def _case_fixes(cf: CaseFile) -> list[str]:
 
 
 def _case_vulnerabilities(cf: CaseFile, max_vulns: int) -> list[str]:
-    header = ["Vulnerability", "CVEs", "Severity", "Hosts", "KEV", "VPR", "Tenable fix text"]
+    header = ["Vulnerability", "CVEs", "Severity", "Hosts", "KEV", "VPR", "EPSS %", "Tenable fix text"]
     rows: list[list[object]] = [
         [
             v.name,
@@ -261,6 +261,7 @@ def _case_vulnerabilities(cf: CaseFile, max_vulns: int) -> list[str]:
             v.hosts,
             "yes" if v.on_cisa_kev else "",
             "" if v.vpr_score is None else v.vpr_score,
+            "" if v.epss_score is None else v.epss_score,
             v.solution,
         ]
         for v in cf.vulnerabilities[:max_vulns]

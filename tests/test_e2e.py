@@ -17,7 +17,9 @@ TIMEOUT_S = 120
 
 def tenable_serving_the_sample() -> FakeTenable:
     """A fake Tenable whose export is the committed sample, so the fetch script runs for real."""
-    chunk = json.loads((SAMPLE / "chunks" / "chunk_1.json").read_text(encoding="utf-8"))
+    chunk = [  # the sample is split into files under 1 MB; the fake Tenable serves them as one chunk
+        r for f in sorted((SAMPLE / "chunks").glob("chunk_*.json")) for r in json.loads(f.read_text(encoding="utf-8"))
+    ]
     plugins = json.loads((SAMPLE / "plugins.json").read_text(encoding="utf-8"))
     return FakeTenable(
         {

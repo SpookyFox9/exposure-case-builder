@@ -112,7 +112,7 @@ def _register_read_tools(mcp: MCPServer, workspace: Workspace) -> None:
         top_n: int = 10, hide_dispositioned: bool = False, order: Literal["score", "coverage"] = "score"
     ) -> dict[str, Any]:
         """Ranked fix packages (product plus kind of fix) with what each contains and how many distinct actions.
-        order="score" (default) ranks by risk score; order="coverage" lists packages in a greedy order that brings
+        order="score" (default) ranks by the weighted sum; order="coverage" lists packages in a greedy order that brings
         the most hosts to zero urgent findings, assuming every earlier step is applied (each row's coverage object
         gives the step; position follows that order, rank stays the score rank)."""
         return workspace.fix_queue(top_n, hide_dispositioned, order)

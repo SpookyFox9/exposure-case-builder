@@ -11,7 +11,7 @@ An analyst should not have to combine dozens of per-asset reports to learn which
 - **For the security team:** what is risky, and why does it rank where it does?
 - **For engineers:** what do I do, what does it clear, and on which hosts?
 
-Output is evidence and facts, not verdicts, and nothing in it recommends action against a person. Every number traces to source finding IDs. Scoring is a fixed weighted sum with the component breakdown shown for every case; there is no machine learning.
+Output is evidence and facts, not verdicts, and nothing in it recommends action against a person. Every number traces to source finding IDs. Scoring is a fixed weighted sum with the component breakdown shown for every case; there is no machine learning. The score is a transparent ordering heuristic, not a measure of risk.
 
 ## Related work
 
@@ -43,7 +43,17 @@ Register it with Claude Code (this edits your Claude config, so you run it yours
 claude mcp add exposure-case --env EXPOSURE_CASE_DATA=<absolute path to data/sample> -- uv run --directory <absolute path to this repo> python -m exposure_case.server
 ```
 
-Then copy `skills/exposure-case` into your Claude skills folder and ask Claude to *"triage the exposure data"*. In Claude Code, leave the `export` and `record_disposition` tools on **ask** (see Security notes).
+Then copy `skills/exposure-case` into your Claude skills folder and ask Claude to *"triage the exposure data"*. In Claude Code, leave the `export` and `record_disposition` tools on **ask** (see Security notes). To make that explicit, add this to `.claude/settings.json` (or your user settings), and never put these two tools on an allow list (the names assume the server was registered as `exposure-case`, as above):
+
+```json
+{
+  "permissions": {
+    "ask": ["mcp__exposure-case__export", "mcp__exposure-case__record_disposition"]
+  }
+}
+```
+
+The server speaks MCP protocol revision 2026-07-28 (the `mcp` 2.3.0 SDK) over stdio.
 
 With your own data, fetch an export first. This is the project's only outbound network call:
 
@@ -75,6 +85,7 @@ Dispositions (`assigned`, `risk-accepted`, `false-positive`, `needs-info`) are o
 
 ## Known limitations
 
+- **EPSS is shown, not scored.** Each vulnerability in a case file carries Tenable's EPSS score (`epss_score`, which Tenable reports as a percentage, 0-100) beside KEV and VPR as a separate signal. It is deliberately not part of the weighted sum: FIRST says EPSS "is not a complete risk score" and should not be multiplied into a combined risk number, and VPR (in the exploit component) already draws on exploit prediction.
 - **The ranking is a judgment, not a validated model.** The weights (severity 30, exploit 25, breadth 15, volume 10, age 5, unsupported 5, recurrence 5, patch 5) are documented and adjustable in `scoring.py`, but nothing here tests them against real outcomes. CISA KEV is common in this tenant (793 of 10,283 active findings *(private export)*), so large patch families score high on the exploit component; the two-list queue exists for that reason.
 - **Fix grouping is heuristic.** A package is a product (the first CPE's vendor and product) plus a fix type read from the opening verb of Tenable's solution text. Tenable's solution text is often generic ("Update the affected packages."), a few plugins have no CPE (they become their own package), and some products list dozens of separate actions that a human can see are cumulative (for example "Upgrade to OpenSSH 10.3 or later" through "10.6 or later"). The tool lists them as given rather than guessing at supersession.
 - **The coverage order is a heuristic, and its steps are not equal effort.** `fix_queue(order="coverage")` puts first the package that brings the most hosts to zero urgent findings (critical, CISA KEV, exploited by malware or a public exploit), given the packages already placed. A step means applying every listed action in that package, and a package can hold many: on the competition tenant *(private export)* the first step is 93 distinct updates for 8 hosts, and 18 of 117 steps reach half of the 115 hosts that have an urgent finding. Hosts cleared is not an effort estimate, "cleared" means no urgent finding in the export (not that a host is secure), and the order is not the shortest plan.
@@ -91,7 +102,9 @@ Dispositions (`assigned`, `risk-accepted`, `false-positive`, `needs-info`) are o
 
 ## Security notes
 
-- **`confirm=true` is a convention, not proof of consent.** The server cannot tell whether a human agreed; Claude passes the flag. The real gate is your client's tool-permission prompt, so keep `export` and `record_disposition` on **ask** and do not allow-list them. The flags are strict booleans, so `"true"` or `1` is refused.
+- **`confirm=true` is a convention, not proof of consent.** The server cannot tell whether a human agreed; Claude passes the flag. The real gate is your client's tool-permission prompt, so keep `export` and `record_disposition` on **ask** and do not allow-list them (settings snippet under How to run). The flags are strict booleans, so `"true"` or `1` is refused.
+- **Tool annotations are hints.** Every tool declares `readOnlyHint`/`destructiveHint`; `export` is marked destructive because writing replaces same-named files. The MCP specification tells clients to treat annotations as untrusted hints, so they are not a control.
+- **Reporting a vulnerability:** see `SECURITY.md` (private reporting through GitHub, and a short threat model).
 - **Tenable text is untrusted.** Plugin names, solution text, hostnames and advisory links come from outside and could contain instructions aimed at a model. The server's instructions and the skill tell Claude to treat them, and recorded disposition notes, as data, never instructions.
 - **No tool accepts a file path.** The data, export and log locations are fixed when the server starts; item IDs are checked against the loaded export.
 - **Secrets.** API keys are read from environment variables only, never written to disk by this project, never printed, and held in an object whose `repr` hides them. Keep them in a secret store outside the repo.

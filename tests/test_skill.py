@@ -59,6 +59,7 @@ def test_skill_does_not_invent_tools(tool_names):
         "data_quality",
         "export_below_workbench",
         "export_above_workbench",
+        "epss_score",
         *CATEGORIES,
     }
     unknown = {c for c in candidates if c not in tool_names and c not in known_fields}

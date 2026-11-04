@@ -127,3 +127,22 @@ def test_sample_rejects_non_empty_output(source, tmp_path):
 def test_sample_rejects_bad_counts(source, tmp_path):
     with pytest.raises(ValueError, match="n_plugins"):
         ms.build_sample(source, tmp_path / "out", n_plugins=0)
+
+
+def test_sample_chunks_stay_under_the_size_limit(source, tmp_path, monkeypatch):
+    # The Exchange's reviewers flag committed files over 1 MB (PR #216, item 25); the sample was 1.56 MB in one file.
+    monkeypatch.setattr(ms, "MAX_CHUNK_BYTES", 3000)
+    out = tmp_path / "out"
+    ms.build_sample(source, out, n_plugins=10, n_notable=10)
+    chunks = sorted((out / "chunks").glob("chunk_*.json"))
+    assert len(chunks) > 1 and all(c.stat().st_size <= 3000 for c in chunks)
+    whole = tmp_path / "whole"
+    monkeypatch.setattr(ms, "MAX_CHUNK_BYTES", 10**9)
+    ms.build_sample(source, whole, n_plugins=10, n_notable=10)
+    assert load_findings(out) == load_findings(whole)
+
+
+def test_committed_sample_files_are_each_under_one_megabyte():
+    sample = Path(__file__).resolve().parent.parent / "data" / "sample"
+    sizes = {p.name: p.stat().st_size for p in sample.rglob("*.json")}
+    assert sizes and all(size < 1_000_000 for size in sizes.values()), sizes

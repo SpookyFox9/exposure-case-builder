@@ -202,3 +202,9 @@ def test_listing_describes_the_coverage_order_without_overclaiming(listing):
     _, tools, _ = listing
     fix_queue = next(t for t in tools if t["name"] == "fix_queue")["description"].lower()
     assert "coverage" in fix_queue and "heuristic" in fix_queue
+
+
+def test_readme_names_the_protocol_revision_the_sdk_speaks():
+    import mcp.types
+
+    assert f"MCP protocol revision {mcp.types.LATEST_PROTOCOL_VERSION}" in (ROOT / "README.md").read_text("utf-8")

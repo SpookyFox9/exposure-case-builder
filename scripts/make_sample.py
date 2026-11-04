@@ -24,6 +24,23 @@ from exposure_case.ingest import IngestError, iter_raw_records, parse_record, re
 
 log = logging.getLogger("make_sample")
 
+MAX_CHUNK_BYTES = 900_000  # keep each committed file under 1 MB (the Exchange's reviewers flag larger files)
+
+
+def _chunks(records: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """Split records into consecutive groups whose JSON stays under MAX_CHUNK_BYTES (one record never splits)."""
+    groups: list[list[dict[str, Any]]] = [[]]
+    size = 2
+    for record in records:
+        added = len(json.dumps(record, indent=0, sort_keys=True).encode("utf-8")) + 2
+        if groups[-1] and size + added > MAX_CHUNK_BYTES:
+            groups.append([])
+            size = 2
+        groups[-1].append(record)
+        size += added
+    return groups
+
+
 ASSET_KEYS = ("uuid", "hostname", "ipv4", "device_type", "operating_system")
 PLUGIN_KEYS = (
     "id",
@@ -126,7 +143,10 @@ def build_sample(src: Path, out: Path, n_plugins: int = 40, n_notable: int = 10)
         rows = found
 
     (out / "chunks").mkdir(parents=True, exist_ok=True)
-    (out / "chunks" / "chunk_1.json").write_text(json.dumps(kept, indent=0, sort_keys=True), encoding="utf-8")
+    for number, group in enumerate(_chunks(kept), start=1):
+        text = json.dumps(group, indent=0, sort_keys=True)
+        path = out / "chunks" / f"chunk_{number}.json"
+        path.write_text(text, encoding="utf-8", newline="\n")  # LF only, so the size is the same on every OS
     (out / "plugins.json").write_text(
         json.dumps(
             {"vulnerabilities": [r for r in rows if isinstance(r, dict) and r.get("plugin_id") in keep]},

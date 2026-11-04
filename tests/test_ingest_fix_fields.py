@@ -109,3 +109,11 @@ def test_vpr_kev_requires_a_real_boolean():
 def test_vpr_score_out_of_range_is_ignored():
     assert rec({"vpr": {"score": 99}}).vpr_score is None
     assert rec({"vpr": {"score": -1}}).vpr_score is None
+
+
+def test_epss_score_is_a_percentage_and_out_of_range_values_are_ignored():
+    # Tenable reports EPSS as a percentage (0.078 to 99.999 on the competition export), not a 0-1 probability.
+    assert rec({"epss_score": 97.5}).epss_score == 97.5
+    assert rec({"epss_score": 100.5}).epss_score is None
+    assert rec({"epss_score": 1e308}).epss_score is None
+    assert rec({"epss_score": -0.1}).epss_score is None

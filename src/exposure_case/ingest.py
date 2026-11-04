@@ -243,7 +243,7 @@ def _signal_fields(plugin: dict) -> dict[str, Any]:
         "has_patch": bool(plugin.get("has_patch")),
         "unsupported_by_vendor": bool(plugin.get("unsupported_by_vendor")),
         "checks_for_default_account": bool(plugin.get("checks_for_default_account")),
-        "epss_score": _opt_number(plugin.get("epss_score"), 0),
+        "epss_score": _opt_number(plugin.get("epss_score"), 0, 100),  # Tenable reports EPSS as a percentage
         "cvss3_base_score": _opt_number(plugin.get("cvss3_base_score"), 0, 10),
         "vpr_score": _opt_number(vpr.get("score"), 0, 10),
         "vpr_severity": _text(vpr.get("vpr_severity")),

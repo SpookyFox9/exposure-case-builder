@@ -74,7 +74,7 @@ analyst decides.** You report facts and evidence, never verdicts.
 2. **Why it ranks here**, from the score components, in plain words.
 3. **What the evidence shows**, each point with finding IDs.
 4. **What limits this** - benign or alternative explanations and gaps: masked data, scanner coverage, VPR and
-   EPSS are probabilities not proof, reopened findings, anything under `limitations`.
+   EPSS are probabilities not proof (`epss_score` is a percentage, 0-100, shown but not scored), reopened findings, anything under `limitations`.
 5. **How it gets fixed**, using Tenable's solution text, labelled as Tenable-provided, naming the fix package.
 6. **What else to check** - evidence to pull or confirm (owner, scan freshness, compensating controls). Not
    actions against anyone.
