@@ -28,15 +28,15 @@ This is an outline to follow, not a script. `docs/DEMO.md` is the longer 15-minu
 - How it works: code clusters, scores and collects evidence; Claude writes the narrative; the human decides.
 
 ### 3. Live demo (about 5 min, share the terminal) [technical, innovation]
-Ask for one beat at a time. While Claude works, talk over it.
+Ask for one beat at a time. While Claude works, talk over it. **Paste these prompts exactly.** The demo clone loads the project's own `CLAUDE.md` and `PLAN.md`, so a vague "What should I look at first?" (rehearsal, 2026-11-04 6:26 PM) got an answer about pitch prep that opened `PITCH.md`. Every prompt names the exposure data or a tool.
 
-- **a. "What should I look at first?"** (`fleet_summary`, `case_queue`, about 1.5 min)
+- **a. "Triage the Tenable exposure data with the exposure-case tools: what should I fix first?"** (`fleet_summary`, `case_queue`, about 1.5 min)
   - Point: there are **two lists on purpose**, threats and backlogs, so a backlog never buries an exploited vulnerability.
   - Top threat: Shellshock, 5 hosts. Top backlog: Windows bulletins, 14 hosts.
   - Point at the score breakdown: a fixed weighted sum shown component by component, no ML.
-- **b. "Open the Shellshock case"** (`case_file`, `findings`, about 1 min)
+- **b. "Open the Shellshock case file and cite its finding ids."** (`case_file`, `findings`, about 1 min)
   - Claude's narrative cites real finding ids. Everything traces back to `finding_id` and `scan.uuid`.
-- **c. "What does the engineer do?"** (`fix_package` OpenSSH, then `export` Markdown, about 2 min) **This is the centerpiece. Spend the most time here.**
+- **c. "Show the OpenSSH patch fix package, then export it as Markdown."** (`fix_package` OpenSSH, then `export` Markdown, about 2 min) **This is the centerpiece. Spend the most time here.**
   - 10 distinct Tenable actions, each with what *it alone* clears.
   - The tool does not claim one update replaces another, because Tenable's data doesn't say so.
   - Show the ticket body: an engineer can act on it without a Tenable login.
