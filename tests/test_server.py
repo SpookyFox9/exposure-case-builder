@@ -125,7 +125,11 @@ def test_annotations_mark_reads_and_local_writes(run):
         assert a.read_only_hint is True and a.open_world_hint is False, name
     for name in WRITE_TOOLS:
         a = run["tools"][name].annotations
-        assert a.read_only_hint is False and a.destructive_hint is False and a.open_world_hint is False, name
+        assert a.read_only_hint is False and a.open_world_hint is False, name
+    # export with write=true replaces files of the same name, which the MCP spec counts as destructive;
+    # record_disposition only appends.
+    assert run["tools"]["export"].annotations.destructive_hint is True
+    assert run["tools"]["record_disposition"].annotations.destructive_hint is False
 
 
 def test_no_tool_accepts_a_path(run):

@@ -54,6 +54,8 @@ MAX_OFFSET = 10_000_000
 MAX_VULNS = 100
 MAX_INLINE_CHARS = 60_000
 MAX_SOLUTION_CHARS = 500
+MAX_REFERENCES = 25  # CVEs, advisories and plugin ids per fix_package answer; exports stay complete
+MAX_EVENT_EVIDENCE = 10  # finding ids per timeline entry; findings pages through the rest
 
 
 class ServiceError(ValueError):
@@ -344,6 +346,10 @@ class Workspace:
             "fixes": slice(0, 10),
         }
         capped = {key: data[key][keep] for key, keep in caps.items()}
+        timeline = [
+            {**e, "evidence": e["evidence"][:MAX_EVENT_EVIDENCE], "evidence_total": len(e["evidence"])}
+            for e in capped["timeline"]
+        ]
         vulnerabilities = [
             {**v, "solution": _shorten(v["solution"], MAX_SOLUTION_CHARS)} for v in capped["vulnerabilities"]
         ]
@@ -351,6 +357,7 @@ class Workspace:
             **data,
             **capped,
             "vulnerabilities": vulnerabilities,
+            "timeline": timeline,
             **{f"{key}_total": len(data[key]) for key in caps},
             "disposition": _disposition_detail(self._latest().get(case_id)),
         }
@@ -360,7 +367,14 @@ class Workspace:
             max_actions, "max_actions", 1, MAX_LIST
         )
         data = self._package_view(package_id).to_dict(max_hosts)
-        package = {**data["package"], "actions": data["package"]["actions"][:max_actions]}
+        full = data["package"]
+        references = {key: full[key][:MAX_REFERENCES] for key in ("cves", "advisories", "plugin_ids")}
+        totals = {f"{key}_total": len(full[key]) for key in references}
+        advisories = [_shorten(a, MAX_SOLUTION_CHARS) for a in references["advisories"]]
+        actions = [
+            {**a, "solution": _shorten(a["solution"], MAX_SOLUTION_CHARS)} for a in full["actions"][:max_actions]
+        ]
+        package = {**full, **references, **totals, "advisories": advisories, "actions": actions}
         return {
             **data,
             "package": package,

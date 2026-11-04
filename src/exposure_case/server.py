@@ -69,6 +69,10 @@ READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempot
 LOCAL_WRITE = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
 )
+# export with write=true replaces files of the same name: destructive in the MCP spec's sense.
+LOCAL_OVERWRITE = ToolAnnotations(
+    read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False
+)
 
 
 def _guard(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -117,14 +121,16 @@ def _register_read_tools(mcp: MCPServer, workspace: Workspace) -> None:
     @_guard
     def case_file(case_id: str, max_hosts: int = 25, max_vulns: int = 15, max_events: int = 40) -> dict[str, Any]:
         """One case: score breakdown, facts, the fix packages that address it, top vulnerabilities, hosts,
-        timeline, limitations and any recorded disposition. Lists are capped; *_total fields give the full size."""
+        timeline, limitations and any recorded disposition. Lists are capped; *_total fields give the full size, and
+        each timeline entry lists at most 10 finding ids (evidence_total); use findings for all of them."""
         return workspace.case_file(case_id, max_hosts, max_vulns, max_events)
 
     @mcp.tool(annotations=READ_ONLY)
     @_guard
     def fix_package(package_id: str, max_hosts: int = 25, max_actions: int = 15) -> dict[str, Any]:
         """One fix package: Tenable's fix actions with what each clears, contained impact, hosts, CVEs and
-        advisories, and the cases it relieves. Totals are contained in the package, not cleared by one action."""
+        advisories, and the cases it relieves. Totals are contained in the package, not cleared by one action.
+        Lists hold the first 25 (*_total gives the size), long text is shortened; the JSON export is complete."""
         return workspace.fix_package(package_id, max_hosts, max_actions)
 
     @mcp.tool(annotations=READ_ONLY)
@@ -146,7 +152,7 @@ def _register_trend_tools(mcp: MCPServer, workspace: Workspace) -> None:
 
 
 def _register_write_tools(mcp: MCPServer, workspace: Workspace) -> None:
-    @mcp.tool(annotations=LOCAL_WRITE)
+    @mcp.tool(annotations=LOCAL_OVERWRITE)
     @_guard
     def export(
         item_id: str,
