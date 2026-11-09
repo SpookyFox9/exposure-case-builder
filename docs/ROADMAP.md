@@ -15,6 +15,7 @@ The decisions behind Exposure Case Builder, the scoring table and the tool list,
 | Fetch client | Standard-library `urllib`, not pyTenable | pyTenable needs Python >= 3.11 and 14 runtime dependencies for a four-endpoint fetch. See `PRIOR_ART.md` |
 | Output locations | Absolute paths, default `~/.exposure-case/` | Nothing is ever written relative to the working directory |
 | MCP SDK and Python | `mcp==2.3.0`. Python >= 3.10, tested on 3.10 and 3.14 | `from mcp.server.mcpserver import MCPServer` |
+| Internals diagrams | Mermaid in `architecture.md`, checked by `tests/test_architecture_diagram.py` against the real tools, modules, imports and disposition-log readers | GitHub draws Mermaid with no build step or new dependency, and CI fails when the diagrams drift. Mermaid syntax itself is not checked locally (see `PRIOR_ART.md`) |
 
 ## Scoring (`scoring.py` is authoritative)
 

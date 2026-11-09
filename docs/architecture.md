@@ -49,6 +49,188 @@ So the same findings are presented as two linked views: **cases** (risk) and **f
 | `service`, `server` | The tool layer; `service` is testable without a protocol, `server` is a thin wrapper |
 | `common`, `schema` | Shared severity order and helpers; `Evidence`, the type every claim traces through |
 
+## How the MCP server works inside
+
+Four diagrams, drawn by GitHub from the Mermaid source. `tests/test_architecture_diagram.py` checks these facts against the code, and fails CI when they drift: the tool names, which tools are writes, the module list, that every tool goes through `service`, that tool-to-module edges point only at modules `service` imports, which modules use `text_safety`, and which tools touch the disposition log. The rest (the pipeline arrows, the sequence diagram, the wording) is checked by review, not by the test. The naming rule the test relies on: a tool node is `tool_<name>`, a module node is `mod_<name>`, a write tool carries `:::write`, and each edge is on its own line.
+
+### 1. One request, end to end
+
+The heavy work is done **once, when the server starts**: ingest, clustering, fix packages, links, scoring and the coverage order are never recomputed. A tool call reads those results and derives only what it shows (per-row facts, caps, shortened text). Case files and package views are built the first time they are asked for and then kept; the disposition log is re-read only when its size or modification time changes.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as MCP client (Claude Code)
+    participant S as server.py (MCPServer, stdio)
+    participant G as _guard
+    participant W as service.Workspace
+    participant R as Built results (cases, packages, links, ranks)
+    participant L as Disposition log (JSONL)
+    Note over S,R: At startup: Workspace.load runs ingest, cluster, fixes, links, scoring, coverage, reconcile (and the trend diff if a baseline is set)
+    C->>S: tools/call case_queue {kind, top_n}
+    S->>S: pydantic checks argument types and enums
+    S->>G: call the tool function
+    G->>W: workspace.case_queue(...)
+    W->>W: range-check integers, look up ids
+    W->>R: read ranked cases (built at startup)
+    W->>W: derive per-row facts and reasons
+    W->>L: latest decision per item (cached until the file changes)
+    W-->>G: new dict, lists capped
+    G-->>S: result, or ServiceError turned into ToolError with its message
+    S-->>C: JSON tool result on stdout
+```
+
+### 2. The nine tools and what each one touches
+
+Every tool goes through `service.Workspace`. Write tools are drawn in orange. `export` is annotated as an overwrite even when it renders inline, because `write=true` replaces files of the same name.
+
+```mermaid
+flowchart LR
+    subgraph mod_server ["server.py: 9 tools over stdio"]
+        tool_fleet_summary["fleet_summary"]
+        tool_case_queue["case_queue"]
+        tool_fix_queue["fix_queue"]
+        tool_case_file["case_file"]
+        tool_fix_package["fix_package"]
+        tool_findings["findings"]
+        tool_trend_diff["trend_diff"]
+        tool_export["export"]:::write
+        tool_record_disposition["record_disposition"]:::write
+    end
+    mod_service["service.Workspace"]
+    store_log[("Disposition log<br/>append-only JSONL")]
+    store_exports[("Export directory<br/>absolute path")]
+
+    tool_fleet_summary --> mod_service
+    tool_case_queue --> mod_service
+    tool_fix_queue --> mod_service
+    tool_case_file --> mod_service
+    tool_fix_package --> mod_service
+    tool_findings --> mod_service
+    tool_trend_diff --> mod_service
+    tool_export --> mod_service
+    tool_record_disposition --> mod_service
+
+    tool_fleet_summary -.-> mod_reconcile
+    tool_case_queue -.-> mod_scoring
+    tool_case_queue -.-> mod_case
+    tool_fix_queue -.-> mod_fixes
+    tool_fix_queue -.-> mod_coverage
+    tool_case_file -.-> mod_case
+    tool_fix_package -.-> mod_case
+    tool_findings -.-> mod_cluster
+    tool_findings -.-> mod_fixes
+    tool_trend_diff -.-> mod_trend_view
+    tool_export -.-> mod_export
+    tool_record_disposition -.-> mod_disposition
+
+    tool_fleet_summary -.-> store_log
+    tool_case_queue -.-> store_log
+    tool_fix_queue -.-> store_log
+    tool_case_file -.-> store_log
+    tool_fix_package -.-> store_log
+    tool_record_disposition -->|"appends one line, confirm=true"| store_log
+    tool_export -->|"write=true and confirm=true"| store_exports
+
+    classDef write fill:#fde2c8,stroke:#c2410c,color:#431407
+```
+
+Dotted edges point at the engine modules whose results the answer is built from (the test checks only that `service` imports each one). Of the read tools, five also read the disposition log, so a recorded decision shows up in queues and detail views.
+
+### 3. The data pipeline, built once at startup
+
+```mermaid
+flowchart TD
+    raw[("Saved Tenable export<br/>EXPOSURE_CASE_DATA")]
+    base[("Earlier export, optional<br/>EXPOSURE_CASE_BASELINE")]
+    mod_ingest["ingest: validate, bound, normalize<br/>to frozen FindingRecord"]
+    mod_cluster["cluster: cases<br/>(patch families, single plugins)"]
+    mod_fixes["fixes: fix packages<br/>(product plus fix type)"]
+    mod_links["links: two-way, refuses if the views disagree"]
+    mod_scoring["scoring: one weighted sum"]
+    mod_coverage["coverage: greedy host-clearing order"]
+    mod_reconcile["reconcile: export vs Tenable plugin counts"]
+    mod_baseline["baseline: load and validate"]
+    mod_trend["trend: compare two pulls"]
+    mod_trend_view["trend_view: counts and pages"]
+    mod_service["service.Workspace<br/>holds every result"]
+    subgraph shared ["Shared helpers, imported by most modules"]
+        mod_common["common: severity order, helpers"]
+        mod_schema["schema: Evidence"]
+    end
+
+    raw --> mod_ingest
+    mod_ingest -->|"FindingRecord"| mod_cluster
+    mod_ingest -->|"FindingRecord"| mod_fixes
+    mod_ingest -->|"plugins.json"| mod_reconcile
+    mod_cluster --> mod_links
+    mod_fixes --> mod_links
+    mod_cluster --> mod_scoring
+    mod_fixes --> mod_scoring
+    mod_fixes --> mod_coverage
+    base --> mod_baseline
+    mod_baseline --> mod_trend
+    mod_trend --> mod_trend_view
+    mod_links --> mod_service
+    mod_scoring --> mod_service
+    mod_coverage --> mod_service
+    mod_reconcile --> mod_service
+    mod_trend_view --> mod_service
+```
+
+On demand, after startup: `case` builds a `CaseFile` or `PackageView` (with `timeline` for the dated events), and `report_md` and `export` render it.
+
+```mermaid
+flowchart LR
+    mod_service["service.Workspace"]
+    mod_case["case: CaseFile, PackageView"]
+    mod_timeline["timeline: dated events from Tenable's dates"]
+    mod_report_md["report_md: Markdown"]
+    mod_export["export: CSV, JSON, atomic file writes"]
+    mod_service -->|"first request for an id"| mod_case
+    mod_case --> mod_timeline
+    mod_case --> mod_report_md
+    mod_report_md --> mod_export
+```
+
+### 4. Trust boundaries
+
+`text_safety` runs in five places. Ingest strips invisible and bidirectional-override characters from every Tenable string, so they never reach a tool answer. The Markdown and CSV renderers escape markup, links and formulas. The JSON export is deliberately the exact unescaped copy (see the README), the source for any other markup that needs its own escaping. The disposition log and the trend view flatten text to one line. **Tool answers in JSON are not Markdown-escaped**: they are capped, never include plugin output, and the server's instructions tell the model that the text in them is data, not instructions.
+
+```mermaid
+flowchart LR
+    subgraph outside ["Outside the server"]
+        tenable["Tenable cloud"]
+        fetch["scripts/fetch_tenable.py<br/>the only network path"]
+    end
+    subgraph disk_in ["Untrusted input on disk"]
+        raw[("data/raw export")]
+    end
+    subgraph process ["Server process: no network calls"]
+        mod_ingest["ingest"]
+        mod_text_safety["text_safety"]
+        mod_report_md["report_md"]
+        mod_export["export"]
+        mod_disposition["disposition"]
+        mod_trend_view["trend_view"]
+    end
+    subgraph disk_out ["Local writes, absolute paths, confirm=true"]
+        store_exports[("Export files<br/>default ~/.exposure-case/exports")]
+        store_log[("Disposition log<br/>default ~/.exposure-case/dispositions.jsonl")]
+    end
+
+    tenable --> fetch
+    fetch --> raw
+    raw --> mod_ingest
+    mod_ingest -->|"strip invisible characters"| mod_text_safety
+    mod_report_md -->|"escape Markdown and links"| mod_text_safety
+    mod_export -->|"CSV: escape cells, prefix formulas"| mod_text_safety
+    mod_disposition -->|"one line"| mod_text_safety
+    mod_trend_view -->|"one line"| mod_text_safety
+    mod_export --> store_exports
+    mod_disposition --> store_log
+```
+
 ## Invariants (each is tested)
 
 1. Every active, non-info finding belongs to exactly one case and exactly one fix package; `links` raises otherwise.
@@ -81,4 +263,4 @@ Weights are a judgment, not validated; fix grouping is heuristic (first CPE, sol
 
 ## Extending
 
-A new fix-type rule belongs in `fixes.classify_fix` with a test row; a new score component in `scoring.WEIGHTS` plus a `_component` function and a golden update; a new tool in `server._register_*_tools`, `service.Workspace`, `docs/exchange/mcp-server-listing.md` and `skills/exposure-case/SKILL.md` (the drift-guard tests fail until all four agree). Run `sh scripts/check_all.sh` before committing.
+A new fix-type rule belongs in `fixes.classify_fix` with a test row; a new score component in `scoring.WEIGHTS` plus a `_component` function and a golden update; a new tool in `server._register_*_tools`, `service.Workspace`, `docs/exchange/mcp-server-listing.md`, `skills/exposure-case/SKILL.md` and diagram 2 above (the drift-guard tests, including `tests/test_architecture_diagram.py`, fail until all five agree); a new module goes in the diagrams too. Run `sh scripts/check_all.sh` before committing.

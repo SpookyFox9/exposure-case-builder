@@ -88,6 +88,10 @@ Licensing conflict inside Tenable's docs: the [licensing page](https://docs.tena
 
 No code was reused. Patch Shepherd, the Chokepoint family and most others are MIT; `tenable-sc-mcp-server` is GPL-3.0-only and `sc-ai-agent` is BSD-3-Clause, so reusing those would carry obligations. Ideas acknowledged: clustering by shared fix (Patch Shepherd, Chokepoint), marginal coverage (Chokepoint), aggregation with provenance (Tenable CTEM MCP).
 
+## Internals diagrams (checked 2026-11-07)
+
+`gh search repos "mcp server architecture diagram mermaid"` and `gh search code "list_tools mermaid"` found nothing that checks an MCP server's diagram against its real tools. The Mermaid syntax linters found (`jasonworden/mermaid-lint`, `Yokozuna59/mermaid-lint`, `suwa-sh/md-mermaid-lint`) all need Node. **Decision: no linter.** It would add a Node toolchain to a Python-only project for a docs check. `tests/test_architecture_diagram.py` checks what the diagrams *say* against the code (tool names, write annotations, module list, imports, disposition-log readers). It does not check Mermaid syntax; GitHub's renderer is the only syntax check, and a broken diagram shows there as an error box.
+
 ## Library decision: pyTenable
 
 Evaluated 2026-11-02 from PyPI metadata: pyTenable 26.10.1, MIT, **requires Python >= 3.11**, 14 runtime dependencies (requests, pydantic, marshmallow, gql, graphql-core, python-box, arrow and others). Our fetch path is four endpoints and the project promises Python >= 3.10 and one runtime dependency. **Decision: keep the stdlib client.** Revisit if the fetch surface grows (pagination, retries, other Tenable products). The community Tenable MCP server builds on pyTenable.
